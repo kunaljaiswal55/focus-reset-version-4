@@ -14,6 +14,7 @@ export default function FinanciallyPage() {
   const [description, setDescription] = useState("");
   const [sector, setSector] = useState("Stocks");
   const [creditor, setCreditor] = useState("");
+  const [isWithdrawal, setIsWithdrawal] = useState(false);
 
   // Add Purchase Modal
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
@@ -34,6 +35,7 @@ export default function FinanciallyPage() {
     earning: { icon: "call_received", color: "secondary", label: "Earning" },
     spending: { icon: "call_made", color: "error", label: "Spending" },
     investment: { icon: "trending_up", color: "primary", label: "Investment" },
+    withdrawal: { icon: "trending_down", color: "error", label: "Withdrawal" },
     debt: { icon: "credit_card", color: "tertiary", label: "Debt" },
   };
 
@@ -122,22 +124,25 @@ export default function FinanciallyPage() {
   // Computed financials
   const earnings = transactions.filter(t => t.type === "earning").reduce((s, t) => s + t.amount, 0);
   const spending = transactions.filter(t => t.type === "spending").reduce((s, t) => s + t.amount, 0);
-  const totalInvested = transactions.filter(t => t.type === "investment").reduce((s, t) => s + t.amount, 0);
+  const totalInvestedIn = transactions.filter(t => t.type === "investment").reduce((s, t) => s + t.amount, 0);
+  const totalWithdrawn = transactions.filter(t => t.type === "withdrawal").reduce((s, t) => s + t.amount, 0);
+  const totalInvested = Math.max(0, totalInvestedIn - totalWithdrawn);
   const rawDebt = transactions.filter(t => t.type === "debt").reduce((s, t) => s + t.amount, 0);
-  // Subtract repaid debts (Future Purchase goals in "Debt" category that are 100% funded)
+  // Subtract ALL repayments: partial payments on active goals + fully settled (deleted) debts
   const activeRepaidDebt = purchases
-    .filter(p => p.category === "Debt" && p.saved >= p.target)
-    .reduce((s, p) => s + p.target, 0);
+    .filter(p => p.category === "Debt")
+    .reduce((s, p) => s + Math.min(p.saved, p.target), 0);
   const totalDebt = Math.max(0, rawDebt - (activeRepaidDebt + settledDebt));
   const liquidAssets = Math.max(0, earnings - spending);
   const netWorth = liquidAssets + totalInvested - totalDebt;
   const savingsRate = earnings > 0 ? (((earnings - spending) / earnings) * 100).toFixed(1) : 0;
 
   // Investment by sector
-  const investmentBySector = sectors.map(s => ({
-    name: s,
-    amount: transactions.filter(t => t.type === "investment" && t.sector === s).reduce((sum, t) => sum + t.amount, 0),
-  }));
+  const investmentBySector = sectors.map(s => {
+    const invested = transactions.filter(t => t.type === "investment" && t.sector === s).reduce((sum, t) => sum + t.amount, 0);
+    const withdrawn = transactions.filter(t => t.type === "withdrawal" && t.sector === s).reduce((sum, t) => sum + t.amount, 0);
+    return { name: s, amount: Math.max(0, invested - withdrawn) };
+  });
   const maxSector = Math.max(...investmentBySector.map(s => s.amount), 1);
 
   const adjustFund = (id, delta) => {
@@ -153,23 +158,27 @@ export default function FinanciallyPage() {
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-IN", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase();
 
+    // If investment tab with withdrawal toggled, the actual type is "withdrawal"
+    const effectiveType = (modalType === "investment" && isWithdrawal) ? "withdrawal" : modalType;
+
     const newTx = {
       id: Date.now(),
-      type: modalType,
+      type: effectiveType,
       amount: amt,
       description: description.trim() ||
-        (modalType === "debt" ? `Debt from ${creditor}` :
-          modalType === "investment" ? `${sector} Investment` :
-            typeConfig[modalType].label),
-      source: modalType === "investment" ? sector : (modalType === "debt" ? creditor : description.trim()),
-      sector: modalType === "investment" ? sector : null,
-      creditor: modalType === "debt" ? creditor : null,
+        (effectiveType === "debt" ? `Debt from ${creditor}` :
+          effectiveType === "investment" ? `${sector} Investment` :
+            effectiveType === "withdrawal" ? `${sector} Withdrawal` :
+              typeConfig[effectiveType].label),
+      source: (effectiveType === "investment" || effectiveType === "withdrawal") ? sector : (effectiveType === "debt" ? creditor : description.trim()),
+      sector: (effectiveType === "investment" || effectiveType === "withdrawal") ? sector : null,
+      creditor: effectiveType === "debt" ? creditor : null,
       date: dateStr,
     };
 
     setTransactions(prev => [newTx, ...prev]);
 
-    if (modalType === "debt" && creditor.trim()) {
+    if (effectiveType === "debt" && creditor.trim()) {
       const colorArr = ["primary", "secondary", "tertiary"];
       setPurchases(prev => [...prev, {
         id: Date.now() + 1,
@@ -181,7 +190,7 @@ export default function FinanciallyPage() {
       }]);
     }
 
-    setAmount(""); setDescription(""); setCreditor(""); setSector("Stocks");
+    setAmount(""); setDescription(""); setCreditor(""); setSector("Stocks"); setIsWithdrawal(false);
     setIsModalOpen(false);
   };
 
@@ -328,7 +337,7 @@ export default function FinanciallyPage() {
                   )}
                   {transactions.map(tx => {
                     const cfg = typeConfig[tx.type] || typeConfig.earning;
-                    const isNegative = tx.type === "spending" || tx.type === "debt";
+                    const isNegative = tx.type === "spending" || tx.type === "debt" || tx.type === "withdrawal";
                     return (
                       <div key={tx.id} className="flex items-center justify-between p-4 rounded-xl hover:bg-surface-bright/30 transition-all">
                         <div className="flex items-center gap-4">
@@ -416,8 +425,18 @@ export default function FinanciallyPage() {
                               <div className="w-px h-4 bg-outline-variant/30 mx-1"></div>
                               <button
                                 onClick={() => {
-                                  if (isDone && purchase.category === "Debt") {
-                                    setSettledDebt(prev => prev + purchase.target);
+                                  if (purchase.category === "Debt") {
+                                    // Always settle whatever has been paid so far (partial or full)
+                                    const paidSoFar = Math.min(purchase.saved, purchase.target);
+                                    if (paidSoFar > 0) {
+                                      setSettledDebt(prev => prev + paidSoFar);
+                                    }
+                                    // If debt goal is deleted without ANY payment, the raw debt
+                                    // transaction still exists. We settle the full target so
+                                    // the debt disappears from net-worth entirely.
+                                    if (paidSoFar === 0) {
+                                      setSettledDebt(prev => prev + purchase.target);
+                                    }
                                   }
                                   setPurchases(purchases.filter(p => p.id !== purchase.id));
                                 }}
@@ -440,32 +459,27 @@ export default function FinanciallyPage() {
                   </div>
                 )}
               </div>
-
-              <div className="mt-10 p-6 bg-surface-container-highest rounded-3xl relative overflow-hidden group">
-                <img
-                  alt="Financial wisdom visual"
-                  className="absolute inset-0 w-full h-full object-cover opacity-20 transition-transform duration-700 group-hover:scale-110"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDz0oXT9sgWMg8acaU5nQ8tyZsVrbOk6n4Mc-lG7dAyJx9yZzRqXFFP--A-2de6K_xEzHLqeLV1dSx6VzrKVB3HMtksc2hNvKB5D4EDjLjNYrfrK-MHwtjmv-UuyVrF3ix7ZMAic56boNKzORq9g2ySUJ4eEvaauPnNRiCQLr5ic0NEuwOSo6MDOojrYv5oH__ZU6eqMEVN-Whfrpb5fvCdpqQFkWtMEeBLD58ywqTCzdLWr_O0NGoRl9pQfwWFf0LIDA7lb0LBPk0t"
-                />
-                <div className="relative z-10">
-                  <p className="font-body italic text-on-surface-variant leading-relaxed">"Wealth is the ability to fully experience life."</p>
-                  <p className="text-[10px] font-label uppercase tracking-widest mt-4 text-primary">Thoreau's Rule</p>
-                </div>
-              </div>
             </div>
 
             {/* Wealth Tip */}
-            <div className="bg-gradient-to-br from-surface-container-high to-surface-container-low p-8 rounded-[2rem] border-b-2 border-primary/20">
-              <div className="flex items-center gap-3 mb-4 text-primary">
-                <span className="material-symbols-outlined">lightbulb</span>
-                <h5 className="font-headline font-bold">Focus Strategy</h5>
+            <div className="bg-gradient-to-br from-surface-container-high to-surface-container-low p-8 rounded-[2rem] border-b-2 border-primary/20 relative overflow-hidden group">
+              <img
+                alt="Financial wisdom visual"
+                className="absolute inset-0 w-full h-full object-cover opacity-20 transition-transform duration-700 group-hover:scale-110"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDz0oXT9sgWMg8acaU5nQ8tyZsVrbOk6n4Mc-lG7dAyJx9yZzRqXFFP--A-2de6K_xEzHLqeLV1dSx6VzrKVB3HMtksc2hNvKB5D4EDjLjNYrfrK-MHwtjmv-UuyVrF3ix7ZMAic56boNKzORq9g2ySUJ4eEvaauPnNRiCQLr5ic0NEuwOSo6MDOojrYv5oH__ZU6eqMEVN-Whfrpb5fvCdpqQFkWtMEeBLD58ywqTCzdLWr_O0NGoRl9pQfwWFf0LIDA7lb0LBPk0t"
+              />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4 text-primary">
+                  <span className="material-symbols-outlined">lightbulb</span>
+                  <h5 className="font-headline font-bold">Focus Strategy</h5>
+                </div>
+                <p className="font-body text-on-surface-variant leading-relaxed">
+                  Track every rupee — earnings, spending, investments and debts — to build a clear picture of your financial health.
+                </p>
+                <button onClick={() => setIsModalOpen(true)} className="mt-6 text-xs font-label font-bold text-primary hover:tracking-widest transition-all">
+                  ADD TRANSACTION →
+                </button>
               </div>
-              <p className="font-body text-on-surface-variant leading-relaxed">
-                Track every rupee — earnings, spending, investments and debts — to build a clear picture of your financial health.
-              </p>
-              <button onClick={() => setIsModalOpen(true)} className="mt-6 text-xs font-label font-bold text-primary hover:tracking-widest transition-all">
-                ADD TRANSACTION →
-              </button>
             </div>
           </div>
         </section>
@@ -518,7 +532,7 @@ export default function FinanciallyPage() {
               {["earning", "spending", "investment", "debt"].map(t => (
                 <button
                   key={t}
-                  onClick={() => setModalType(t)}
+                  onClick={() => { setModalType(t); if (t !== "investment") setIsWithdrawal(false); }}
                   className={`py-2 rounded-lg text-xs font-label font-bold capitalize transition-all ${modalType === t
                     ? "bg-surface-container-high text-on-surface shadow-sm"
                     : "text-on-surface-variant hover:text-on-surface"
@@ -544,18 +558,44 @@ export default function FinanciallyPage() {
                 />
               </div>
 
-              {/* Sector (investment only) */}
+              {/* Invest / Withdraw toggle + Sector (investment tab) */}
               {modalType === "investment" && (
-                <div>
-                  <label className="block text-xs font-label text-on-surface-variant uppercase tracking-widest mb-2">Sector</label>
-                  <select
-                    value={sector}
-                    onChange={e => setSector(e.target.value)}
-                    className="w-full bg-surface-container-lowest/50 rounded-xl p-3 text-on-surface font-body border border-outline-variant/10 focus:outline-none focus:border-primary/50 transition-all appearance-none"
-                  >
-                    {sectors.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
+                <>
+                  <div className="flex items-center gap-2 bg-surface-container-low rounded-xl p-1">
+                    <button
+                      onClick={() => setIsWithdrawal(false)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-label font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        !isWithdrawal
+                          ? "bg-primary/15 text-primary shadow-sm"
+                          : "text-on-surface-variant hover:text-on-surface"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">trending_up</span>
+                      Invest
+                    </button>
+                    <button
+                      onClick={() => setIsWithdrawal(true)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-label font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        isWithdrawal
+                          ? "bg-error/15 text-error shadow-sm"
+                          : "text-on-surface-variant hover:text-on-surface"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">trending_down</span>
+                      Withdraw
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-label text-on-surface-variant uppercase tracking-widest mb-2">Sector</label>
+                    <select
+                      value={sector}
+                      onChange={e => setSector(e.target.value)}
+                      className="w-full bg-surface-container-lowest/50 rounded-xl p-3 text-on-surface font-body border border-outline-variant/10 focus:outline-none focus:border-primary/50 transition-all appearance-none"
+                    >
+                      {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </>
               )}
 
               {/* Creditor (debt only) */}
@@ -585,7 +625,7 @@ export default function FinanciallyPage() {
                   placeholder={
                     modalType === "earning" ? "e.g., Freelance, Salary" :
                       modalType === "spending" ? "e.g., Groceries, Rent" :
-                        modalType === "investment" ? "e.g., SIP, Lump sum" :
+                        modalType === "investment" ? (isWithdrawal ? "e.g., Emergency, Profit booking" : "e.g., SIP, Lump sum") :
                           "e.g., Home loan, Personal loan"
                   }
                 />
@@ -611,7 +651,7 @@ export default function FinanciallyPage() {
                 onClick={handleAddTransaction}
                 className="px-8 py-3 bg-gradient-to-r from-primary to-primary-dim text-on-primary rounded-full font-label text-sm font-bold shadow-lg hover:shadow-primary/30 active:scale-95 transition-all"
               >
-                Add {modalType.charAt(0).toUpperCase() + modalType.slice(1)}
+                {modalType === "investment" && isWithdrawal ? "Withdraw" : `Add ${modalType.charAt(0).toUpperCase() + modalType.slice(1)}`}
               </button>
             </div>
           </div>
