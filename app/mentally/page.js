@@ -1,6 +1,7 @@
 "use client";
 import YouTubeTracker from "@/components/YouTubeTracker";
 import CurriculumTracker from "@/components/CurriculumTracker";
+import ActiveReflections from "@/components/ActiveReflections";
 
 export default function MentallyPage() {
   return (
@@ -30,33 +31,12 @@ export default function MentallyPage() {
           {/* YouTube Study Lecture Section (Left Column) */}
           <div className="col-span-12 lg:col-span-7 space-y-6">
             <YouTubeTracker />
-
-            {/* Academic Notes Section */}
-            <div className="bg-surface-container-high p-8 rounded-[2rem] border border-outline-variant/5">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-headline font-bold flex items-center gap-3">
-                  <span className="material-symbols-outlined text-tertiary">edit_note</span>
-                  Active Reflections
-                </h3>
-                <button className="text-xs font-label uppercase tracking-widest text-primary font-bold">New Entry</button>
-              </div>
-              <div className="space-y-4">
-                <div className="bg-surface-container-low p-6 rounded-2xl border-b-2 border-outline-variant/20">
-                  <p className="font-body text-xl text-on-surface-variant leading-relaxed italic">
-                    "The brain is not just a hard drive for data; it's a dynamic landscape. Focus sessions allow for intentional landscaping of neural pathways..."
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="text-xs font-label text-outline uppercase tracking-widest">Added in Chapter 2</span>
-                    <span className="material-symbols-outlined text-sm text-outline">more_horiz</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Academy Progress Tracker (Right Column) */}
           <div className="col-span-12 lg:col-span-5 flex flex-col gap-6">
             <CurriculumTracker />
+            <ActiveReflections />
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export default function CurriculumTracker() {
   const [playlists, setPlaylists] = useState([]);
@@ -13,6 +13,7 @@ export default function CurriculumTracker() {
 
   // Add subtopic
   const [addingSubTo, setAddingSubTo] = useState(null);
+  const [fetchingChapters, setFetchingChapters] = useState({});
   const [newSubTitle, setNewSubTitle] = useState("");
 
   // Load playlists from shared localStorage
@@ -55,6 +56,40 @@ export default function CurriculumTracker() {
 
   const active = playlists.find(p => p.id === activePlaylist);
 
+  // Fetch timestamps/chapters from a YouTube video and add as subtopics
+  const fetchChapters = useCallback(async (topicId, videoId) => {
+    if (!videoId) return;
+    setFetchingChapters(prev => ({ ...prev, [topicId]: true }));
+    try {
+      const res = await fetch(`/api/youtube-chapters?id=${videoId}`);
+      const data = await res.json();
+      if (data.chapters && data.chapters.length > 0) {
+        setCurriculum(prev => prev.map(c => {
+          if (c.playlistId !== activePlaylist) return c;
+          return {
+            ...c,
+            topics: c.topics.map(t => {
+              if (t.id !== topicId) return t;
+              // Only add chapters that don't already exist as subtopics
+              const existingTitles = new Set(t.subtopics.map(s => s.title));
+              const newSubs = data.chapters
+                .filter(ch => !existingTitles.has(`${ch.time} ${ch.title}`))
+                .map((ch, i) => ({
+                  id: Date.now() + i + 100,
+                  title: `${ch.time} ${ch.title}`,
+                  checked: false,
+                }));
+              return { ...t, subtopics: [...t.subtopics, ...newSubs], chaptersLoaded: true };
+            }),
+          };
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch chapters:", err);
+    }
+    setFetchingChapters(prev => ({ ...prev, [topicId]: false }));
+  }, [activePlaylist]);
+
   // Get curriculum for active playlist, auto-generate from lectures if none exists
   const getPlaylistCurriculum = () => {
     const existing = curriculum.find(c => c.playlistId === activePlaylist);
@@ -64,12 +99,16 @@ export default function CurriculumTracker() {
       const topics = active.lectures.map((lec, i) => ({
         id: Date.now() + i,
         title: lec.title,
+        videoId: lec.videoId,
         checked: lec.completed || false,
         subtopics: [],
         isCustom: false,
+        chaptersLoaded: false,
       }));
       const newCurr = { playlistId: activePlaylist, topics };
       setCurriculum(prev => [...prev, newCurr]);
+      // Auto-fetch chapters for each topic
+      topics.forEach(t => { if (t.videoId) fetchChapters(t.id, t.videoId); });
       return newCurr;
     }
     return null;
@@ -89,15 +128,28 @@ export default function CurriculumTracker() {
   };
 
   const toggleTopic = (topicId) => {
-    updateTopics(topics.map(t => t.id === topicId ? { ...t, checked: !t.checked } : t));
+    updateTopics(topics.map(t => {
+      if (t.id === topicId) {
+        const newChecked = !t.checked;
+        return {
+          ...t,
+          checked: newChecked,
+          subtopics: t.subtopics.map(s => ({ ...s, checked: newChecked }))
+        };
+      }
+      return t;
+    }));
   };
 
   const toggleSub = (topicId, subId) => {
-    updateTopics(topics.map(t =>
-      t.id === topicId
-        ? { ...t, subtopics: t.subtopics.map(s => s.id === subId ? { ...s, checked: !s.checked } : s) }
-        : t
-    ));
+    updateTopics(topics.map(t => {
+      if (t.id === topicId) {
+        const newSubs = t.subtopics.map(s => s.id === subId ? { ...s, checked: !s.checked } : s);
+        const allChecked = newSubs.length > 0 && newSubs.every(s => s.checked);
+        return { ...t, subtopics: newSubs, checked: allChecked };
+      }
+      return t;
+    }));
   };
 
   const deleteTopic = (topicId) => {
@@ -128,6 +180,27 @@ export default function CurriculumTracker() {
     setAddingSubTo(null);
   };
 
+  // Sync: re-add deleted topics from playlist lectures
+  const syncFromPlaylist = () => {
+    if (!active) return;
+    const existingTitles = new Set(topics.map(t => t.title));
+    const missing = active.lectures.filter(l => !existingTitles.has(l.title));
+    if (missing.length === 0) return;
+    const newTopics = missing.map((l, i) => ({
+      id: Date.now() + i + 800,
+      title: l.title,
+      videoId: l.videoId,
+      checked: false,
+      subtopics: [],
+      isCustom: false,
+      chaptersLoaded: false,
+    }));
+    updateTopics([...topics, ...newTopics]);
+    newTopics.forEach(t => { if (t.videoId) fetchChapters(t.id, t.videoId); });
+  };
+
+  const missingCount = active ? active.lectures.filter(l => !new Set(topics.map(t => t.title)).has(l.title)).length : 0;
+
   // Sync: regenerate curriculum when playlist lectures change
   useEffect(() => {
     if (!active || !isLoaded) return;
@@ -141,11 +214,15 @@ export default function CurriculumTracker() {
       const newTopics = newLectures.map((l, i) => ({
         id: Date.now() + i + 500,
         title: l.title,
+        videoId: l.videoId,
         checked: l.completed || false,
         subtopics: [],
         isCustom: false,
+        chaptersLoaded: false,
       }));
       updateTopics([...existing.topics, ...newTopics]);
+      // Auto-fetch chapters for new topics
+      newTopics.forEach(t => { if (t.videoId) fetchChapters(t.id, t.videoId); });
     }
 
     // Remove auto-generated topics whose lectures were deleted (keep custom ones)
@@ -165,7 +242,7 @@ export default function CurriculumTracker() {
 
   return (
     <>
-      <div className="bg-surface-container p-8 rounded-[2rem] border border-outline-variant/5 flex-grow">
+      <div className="bg-surface-container p-8 rounded-[2rem] border border-outline-variant/5">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-headline font-bold text-on-surface">Curriculum Tracker</h2>
@@ -173,12 +250,24 @@ export default function CurriculumTracker() {
               {active ? active.title : "Select a playlist"}
             </p>
           </div>
-          <div className="h-16 w-16 relative">
+          <div className="flex items-center gap-4">
+            <button onClick={syncFromPlaylist} disabled={missingCount === 0 || !active}
+              className={`flex items-center gap-1 px-4 py-2 rounded-full text-xs font-label font-bold transition-colors ${
+                missingCount > 0 
+                  ? "bg-primary/20 text-primary hover:bg-primary/30 shadow-sm" 
+                  : "bg-surface-container-highest text-on-surface-variant opacity-50"
+              }`}
+              title={missingCount > 0 ? `Sync ${missingCount} missing topic(s) from playlist` : "Curriculum is synced with playlist"}>
+              <span className="material-symbols-outlined text-[16px]">sync</span>
+              {missingCount > 0 ? `Sync (${missingCount})` : "Synced"}
+            </button>
+            <div className="h-16 w-16 relative shrink-0">
             <svg className="h-full w-full transform -rotate-90" viewBox="0 0 64 64">
               <circle cx="32" cy="32" fill="transparent" r="28" stroke="#1d2024" strokeWidth="6" />
               <circle cx="32" cy="32" fill="transparent" r="28" stroke="#9df197" strokeDasharray={circumference} strokeDashoffset={dashOffset} strokeWidth="6" strokeLinecap="round" className="transition-all duration-700" />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">{progressPercent}%</div>
+          </div>
           </div>
         </div>
 
@@ -220,6 +309,14 @@ export default function CurriculumTracker() {
                         {topic.title}
                       </p>
                       <div className="flex items-center gap-1 opacity-0 group-hover/topic:opacity-100 transition-opacity shrink-0">
+                        {topic.videoId && !topic.chaptersLoaded && (
+                          <button onClick={() => fetchChapters(topic.id, topic.videoId)} disabled={fetchingChapters[topic.id]}
+                            className="w-5 h-5 rounded flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors" title="Fetch timestamps">
+                            <span className={`material-symbols-outlined text-[14px] ${fetchingChapters[topic.id] ? 'animate-spin' : ''}`}>
+                              {fetchingChapters[topic.id] ? 'progress_activity' : 'schedule'}
+                            </span>
+                          </button>
+                        )}
                         <button onClick={() => { setAddingSubTo(topic.id); setNewSubTitle(""); }}
                           className="w-5 h-5 rounded flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors" title="Add subtopic">
                           <span className="material-symbols-outlined text-[14px]">add</span>

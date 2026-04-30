@@ -26,6 +26,7 @@ export default function YouTubeTracker() {
   const [isAddLecture, setIsAddLecture] = useState(false);
   const [lectureTitle, setLectureTitle] = useState("");
   const [lectureUrl, setLectureUrl] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   // Playing
   const [playingLecture, setPlayingLecture] = useState(null);
@@ -203,6 +204,33 @@ export default function YouTubeTracker() {
     setLectureTitle(""); setLectureUrl(""); setIsAddLecture(false);
   };
 
+  const syncPlaylist = async () => {
+    if (!active || !active.playlistId) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(`/api/youtube-playlist?id=${active.playlistId}`);
+      const data = await res.json();
+      if (data.videos) {
+        const existingIds = new Set(active.lectures.map(l => l.videoId));
+        const missing = data.videos.filter(v => !existingIds.has(v.videoId));
+        if (missing.length > 0) {
+          const newLectures = missing.map((v, i) => ({
+            id: Date.now() + i + 200,
+            title: v.title,
+            videoId: v.videoId,
+            duration: v.duration,
+            currentTime: 0,
+            completed: false,
+          }));
+          setPlaylists(prev => prev.map(p =>
+            p.id === active.id ? { ...p, lectures: [...p.lectures, ...newLectures] } : p
+          ));
+        }
+      }
+    } catch (err) {}
+    setSyncing(false);
+  };
+
   const toggleComplete = (lectureId) => {
     setPlaylists(prev => prev.map(p =>
       p.id === active?.id
@@ -276,10 +304,19 @@ export default function YouTubeTracker() {
             <span className="material-symbols-outlined text-primary">queue_music</span>
             My Playlists
           </h3>
-          <button onClick={() => setIsAddModal(true)}
-            className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-on-primary transition-colors" title="Add Playlist">
-            <span className="material-symbols-outlined text-[18px]">add</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {active?.playlistId && (
+              <button onClick={syncPlaylist} disabled={syncing}
+                className="h-8 px-3 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center gap-1 hover:text-primary transition-colors disabled:opacity-50" title="Resync missing videos from YouTube">
+                <span className={`material-symbols-outlined text-[14px] ${syncing ? 'animate-spin' : ''}`}>sync</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Sync</span>
+              </button>
+            )}
+            <button onClick={() => setIsAddModal(true)}
+              className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-on-primary transition-colors" title="Add Playlist">
+              <span className="material-symbols-outlined text-[18px]">add</span>
+            </button>
+          </div>
         </div>
 
         {/* Playlist pills */}
