@@ -15,6 +15,9 @@ export default function Home() {
   const [journalEntries, setJournalEntries] = useState({});
   const [tasks, setTasks] = useState([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [mentallyScore, setMentallyScore] = useState(0);
+  const [financialScore, setFinancialScore] = useState(null);
+  const [socialScore, setSocialScore] = useState(null);
 
   useEffect(() => {
     // Hydrate journal entries from local storage
@@ -133,6 +136,7 @@ export default function Home() {
   };
 
   useEffect(() => {
+    /* 
     fetch('/api/user-stats')
       .then(res => res.json())
       .then(data => {
@@ -141,6 +145,54 @@ export default function Home() {
         }
       })
       .catch(err => console.error("Error fetching stats:", err));
+    */
+      
+    // Calculate Financial score dynamically from Transactions
+    const savedFin = localStorage.getItem('fin_transactions');
+    if (savedFin) {
+      try {
+        const txs = JSON.parse(savedFin);
+        const earnings = txs.filter(t => t.type === "earning").reduce((s, t) => s + t.amount, 0);
+        const spending = txs.filter(t => t.type === "spending").reduce((s, t) => s + t.amount, 0);
+        const sr = earnings > 0 ? (((earnings - spending) / earnings) * 100) : 0;
+        setFinancialScore(Math.round(sr));
+      } catch (err) {}
+    }
+
+    // Calculate Mentally score dynamically from Curriculum Tracker
+    const savedCurr = localStorage.getItem('yt_curriculum');
+    if (savedCurr) {
+      try {
+        const curriculum = JSON.parse(savedCurr);
+        let totalItems = 0;
+        let checkedItems = 0;
+        
+        curriculum.forEach(playlist => {
+          playlist.topics.forEach(t => {
+            totalItems++;
+            if (t.checked) checkedItems++;
+            (t.subtopics || []).forEach(s => {
+              totalItems++;
+              if (s.checked) checkedItems++;
+            });
+          });
+        });
+        
+        if (totalItems > 0) {
+          setMentallyScore(Math.round((checkedItems / totalItems) * 100));
+        }
+      } catch (err) {}
+    }
+    
+    // Calculate Socially score dynamically from Social Metrics
+    const savedSoc = localStorage.getItem('soc_metrics');
+    if (savedSoc) {
+      try {
+        const metrics = JSON.parse(savedSoc);
+        const avg = (metrics.family + metrics.friends + metrics.parties + metrics.outings) / 4;
+        setSocialScore(Math.round(avg));
+      } catch (err) {}
+    }
   }, []);
 
   useEffect(() => {
@@ -154,6 +206,7 @@ export default function Home() {
       
       if (timerMode === 'Deep Focus') {
         setCycleCount(c => c + 1);
+        /*
         fetch('/api/focus-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -162,6 +215,7 @@ export default function Home() {
         .then(res => res.json())
         .then(data => console.log('Session logged:', data))
         .catch(console.error);
+        */
       }
     }
     return () => clearInterval(interval);
@@ -188,8 +242,8 @@ export default function Home() {
   const seconds = (timeLeft % 60).toString().padStart(2, '0');
 
   const avgQuadrantScore = Math.round(
-    ((stats?.quadrants?.mentally || 0) +
-    (stats?.quadrants?.financially || 0) +
+    ((mentallyScore || stats?.quadrants?.mentally || 0) +
+    (financialScore !== null ? Math.max(0, financialScore) : stats?.quadrants?.financially || 0) +
     (stats?.quadrants?.socially || 0) +
     (stats?.quadrants?.physically || 0)) / 4
   ) || 0;
@@ -297,12 +351,12 @@ export default function Home() {
                 <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                   <span className="material-symbols-outlined" data-icon="psychology">psychology</span>
                 </div>
-                <span className="text-2xl font-headline font-bold text-primary">{stats?.quadrants?.mentally || 0}%</span>
+                <span className="text-2xl font-headline font-bold text-primary">{mentallyScore || stats?.quadrants?.mentally || 0}%</span>
               </div>
               <h4 className="font-headline font-bold text-lg mb-1">Mentally</h4>
-              <p className="text-on-surface-variant font-body italic text-sm mb-6">Cognitive load is low</p>
+              <p className="text-on-surface-variant font-body italic text-sm mb-6">Curriculum progress mapped</p>
               <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                <div className="h-full bg-primary rounded-full shadow-[0_0_8px_rgba(129,236,255,0.4)]" style={{ width: `${stats?.quadrants?.mentally || 0}%` }}></div>
+                <div className="h-full bg-primary rounded-full shadow-[0_0_8px_rgba(129,236,255,0.4)]" style={{ width: `${mentallyScore || stats?.quadrants?.mentally || 0}%` }}></div>
               </div>
             </Link>
             {/* Financially */}
@@ -311,12 +365,14 @@ export default function Home() {
                 <div className="w-12 h-12 bg-tertiary/10 rounded-2xl flex items-center justify-center text-tertiary group-hover:scale-110 transition-transform">
                   <span className="material-symbols-outlined" data-icon="payments">payments</span>
                 </div>
-                <span className="text-2xl font-headline font-bold text-tertiary">{stats?.quadrants?.financially || 0}%</span>
+                <span className={`text-2xl font-headline font-bold ${financialScore !== null && financialScore < 5 ? 'text-error' : 'text-tertiary'}`}>
+                  {financialScore !== null ? financialScore : stats?.quadrants?.financially || 0}%
+                </span>
               </div>
               <h4 className="font-headline font-bold text-lg mb-1">Financially</h4>
-              <p className="text-on-surface-variant font-body italic text-sm mb-6">Review budget needed</p>
+              <p className="text-on-surface-variant font-body italic text-sm mb-6">Based on Savings Rate</p>
               <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                <div className="h-full bg-tertiary rounded-full shadow-[0_0_8px_rgba(255,197,99,0.4)]" style={{ width: `${stats?.quadrants?.financially || 0}%` }}></div>
+                <div className={`h-full rounded-full shadow-[0_0_8px_rgba(255,197,99,0.4)] ${financialScore !== null && financialScore < 5 ? 'bg-error' : 'bg-tertiary'}`} style={{ width: `${Math.max(0, Math.min(100, financialScore !== null ? financialScore : stats?.quadrants?.financially || 0))}%` }}></div>
               </div>
             </Link>
             {/* Socially */}
@@ -325,12 +381,12 @@ export default function Home() {
                 <div className="w-12 h-12 bg-secondary/10 rounded-2xl flex items-center justify-center text-secondary group-hover:scale-110 transition-transform">
                   <span className="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
                 </div>
-                <span className="text-2xl font-headline font-bold text-secondary">{stats?.quadrants?.socially || 0}%</span>
+                <span className="text-2xl font-headline font-bold text-secondary">{socialScore !== null ? socialScore : stats?.quadrants?.socially || 0}%</span>
               </div>
               <h4 className="font-headline font-bold text-lg mb-1">Socially</h4>
               <p className="text-on-surface-variant font-body italic text-sm mb-6">Connection balance good</p>
               <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                <div className="h-full bg-secondary rounded-full shadow-[0_0_8px_rgba(157,241,151,0.4)]" style={{ width: `${stats?.quadrants?.socially || 0}%` }}></div>
+                <div className="h-full bg-secondary rounded-full shadow-[0_0_8px_rgba(157,241,151,0.4)]" style={{ width: `${socialScore !== null ? socialScore : stats?.quadrants?.socially || 0}%` }}></div>
               </div>
             </Link>
             {/* Physically */}

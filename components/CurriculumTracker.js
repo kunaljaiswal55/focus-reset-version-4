@@ -51,7 +51,10 @@ export default function CurriculumTracker() {
 
   // Save curriculum
   useEffect(() => {
-    if (isLoaded) localStorage.setItem("yt_curriculum", JSON.stringify(curriculum));
+    if (isLoaded) {
+      localStorage.setItem("yt_curriculum", JSON.stringify(curriculum));
+      window.dispatchEvent(new Event("curriculumUpdated"));
+    }
   }, [curriculum, isLoaded]);
 
   const active = playlists.find(p => p.id === activePlaylist);
@@ -71,13 +74,12 @@ export default function CurriculumTracker() {
             topics: c.topics.map(t => {
               if (t.id !== topicId) return t;
               // Only add chapters that don't already exist as subtopics
-              const existingTitles = new Set(t.subtopics.map(s => s.title));
               const newSubs = data.chapters
-                .filter(ch => !existingTitles.has(`${ch.time} ${ch.title}`))
+                .filter(ch => !t.subtopics.some(s => s.title === `${ch.time} ${ch.title}`))
                 .map((ch, i) => ({
-                  id: Date.now() + i + 100,
+                  id: Date.now() + i + 1000,
                   title: `${ch.time} ${ch.title}`,
-                  checked: false,
+                  checked: t.checked, // Inherit checked status
                 }));
               return { ...t, subtopics: [...t.subtopics, ...newSubs], chaptersLoaded: true };
             }),
@@ -240,6 +242,21 @@ export default function CurriculumTracker() {
   const circumference = 2 * Math.PI * 28;
   const dashOffset = circumference - (progressPercent / 100) * circumference;
 
+  const repairCurriculum = () => {
+    setCurriculum(prev => prev.map(c => ({
+      ...c,
+      topics: c.topics.map(t => ({
+        ...t,
+        subtopics: (t.subtopics || []).map(s => t.checked ? { ...s, checked: true } : s)
+      }))
+    })));
+  };
+
+  const handleSyncClick = () => {
+    repairCurriculum();
+    syncFromPlaylist();
+  };
+
   return (
     <>
       <div className="bg-surface-container p-8 rounded-[2rem] border border-outline-variant/5">
@@ -251,15 +268,11 @@ export default function CurriculumTracker() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={syncFromPlaylist} disabled={missingCount === 0 || !active}
-              className={`flex items-center gap-1 px-4 py-2 rounded-full text-xs font-label font-bold transition-colors ${
-                missingCount > 0 
-                  ? "bg-primary/20 text-primary hover:bg-primary/30 shadow-sm" 
-                  : "bg-surface-container-highest text-on-surface-variant opacity-50"
-              }`}
-              title={missingCount > 0 ? `Sync ${missingCount} missing topic(s) from playlist` : "Curriculum is synced with playlist"}>
+            <button onClick={handleSyncClick}
+              className={`flex items-center gap-1 px-4 py-2 rounded-full text-xs font-label font-bold transition-colors bg-primary/20 text-primary hover:bg-primary/30 shadow-sm`}
+              title="Force sync and repair progress inconsistencies">
               <span className="material-symbols-outlined text-[16px]">sync</span>
-              {missingCount > 0 ? `Sync (${missingCount})` : "Synced"}
+              Sync & Repair
             </button>
             <div className="h-16 w-16 relative shrink-0">
             <svg className="h-full w-full transform -rotate-90" viewBox="0 0 64 64">

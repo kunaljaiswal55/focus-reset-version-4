@@ -1,4 +1,19 @@
+"use client";
+import { useState, useEffect } from "react";
+
 export default function Topnav() {
+  const [dateStr, setDateStr] = useState("");
+
+  useEffect(() => {
+    const now = new Date();
+    const formatted = now.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    setDateStr(formatted);
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 bg-[#0c0e11]/60 backdrop-blur-xl flex justify-between items-center w-full px-8 py-4">
       <div className="flex items-center gap-4">
@@ -9,7 +24,7 @@ export default function Topnav() {
         </div>
         <div className="hidden sm:block">
           <h2 className="text-[#f9f9fd] font-headline font-bold text-lg leading-tight">Focus Reset</h2>
-          <p className="text-on-surface-variant font-label text-[10px] uppercase tracking-[0.2em]">Monday, Oct 23</p>
+          <p className="text-on-surface-variant font-label text-[10px] uppercase tracking-[0.2em]">{dateStr || "Loading..."}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">

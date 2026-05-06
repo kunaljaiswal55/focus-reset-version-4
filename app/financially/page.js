@@ -22,6 +22,10 @@ export default function FinanciallyPage() {
   const [purchaseCategory, setPurchaseCategory] = useState("Utility");
   const [purchaseTarget, setPurchaseTarget] = useState("");
 
+  // Fund Goal Modal
+  const [fundModal, setFundModal] = useState({ isOpen: false, purchaseId: null, title: "", type: "add" });
+  const [fundAmount, setFundAmount] = useState("");
+
   const colorMap = {
     primary: { text: "text-primary", bg: "bg-primary" },
     secondary: { text: "text-secondary", bg: "bg-secondary" },
@@ -133,22 +137,58 @@ export default function FinanciallyPage() {
     .filter(p => p.category === "Debt")
     .reduce((s, p) => s + Math.min(p.saved, p.target), 0);
   const totalDebt = Math.max(0, rawDebt - (activeRepaidDebt + settledDebt));
-  const liquidAssets = Math.max(0, earnings - spending);
+  const liquidAssets = Math.max(0, earnings + rawDebt + totalWithdrawn - spending - totalInvestedIn);
   const netWorth = liquidAssets + totalInvested - totalDebt;
   const savingsRate = earnings > 0 ? (((earnings - spending) / earnings) * 100).toFixed(1) : 0;
 
-  // Investment by sector
+  // Investment by sector (Cash equals liquidAssets)
   const investmentBySector = sectors.map(s => {
+    if (s === "Cash") {
+      return { name: "Cash", amount: liquidAssets };
+    }
     const invested = transactions.filter(t => t.type === "investment" && t.sector === s).reduce((sum, t) => sum + t.amount, 0);
     const withdrawn = transactions.filter(t => t.type === "withdrawal" && t.sector === s).reduce((sum, t) => sum + t.amount, 0);
     return { name: s, amount: Math.max(0, invested - withdrawn) };
   });
   const maxSector = Math.max(...investmentBySector.map(s => s.amount), 1);
 
-  const adjustFund = (id, delta) => {
-    setPurchases(purchases.map(p =>
-      p.id === id ? { ...p, saved: Math.max(0, Math.min(p.target, p.saved + delta)) } : p
-    ));
+  const handleFundSubmit = () => {
+    const amt = parseFloat(fundAmount);
+    if (isNaN(amt) || amt <= 0) return;
+    
+    const purchase = purchases.find(p => p.id === fundModal.purchaseId);
+    if (!purchase) return;
+
+    let actualDelta = 0;
+    if (fundModal.type === "add") {
+       actualDelta = Math.min(amt, purchase.target - purchase.saved);
+    } else {
+       actualDelta = -Math.min(amt, purchase.saved);
+    }
+
+    if (actualDelta !== 0) {
+      setPurchases(prev => prev.map(p =>
+        p.id === purchase.id ? { ...p, saved: p.saved + actualDelta } : p
+      ));
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString("en-IN", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase();
+      const txType = actualDelta > 0 ? "spending" : "earning";
+      const desc = actualDelta > 0 ? `Funded: ${purchase.title}` : `Refunded: ${purchase.title}`;
+
+      const newTx = {
+        id: Date.now(),
+        type: txType,
+        amount: Math.abs(actualDelta),
+        description: desc,
+        source: "Goal Allocation",
+        sector: null,
+        creditor: null,
+        date: dateStr,
+      };
+      setTransactions(prev => [newTx, ...prev]);
+    }
+    setFundModal({ isOpen: false, purchaseId: null, title: "", type: "add" });
   };
 
   const handleAddTransaction = () => {
@@ -216,8 +256,8 @@ export default function FinanciallyPage() {
               <h3 className="text-6xl font-headline font-bold mt-4 text-on-surface">
                 &#8377;{Math.floor(netWorth).toLocaleString("en-IN")}.<span className="text-primary-dim">{String(Math.round((netWorth % 1) * 100)).padStart(2, "0")}</span>
               </h3>
-              <div className="flex items-center gap-2 mt-4 text-secondary">
-                <span className="material-symbols-outlined">trending_up</span>
+              <div className={`flex items-center gap-2 mt-4 ${parseFloat(savingsRate) < 5 ? 'text-error' : 'text-secondary'}`}>
+                <span className="material-symbols-outlined">{parseFloat(savingsRate) < 5 ? 'trending_down' : 'trending_up'}</span>
                 <span className="font-label font-bold">Savings Rate: {savingsRate}%</span>
               </div>
             </div>
@@ -274,9 +314,9 @@ export default function FinanciallyPage() {
             <div className="mt-6 pt-6 border-t border-outline-variant/15">
               <p className="text-xs text-on-surface-variant mb-2">Savings Rate</p>
               <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-1000 ease-in-out" style={{ width: `${Math.max(0, Math.min(100, savingsRate))}%` }}></div>
+                <div className={`h-full transition-all duration-1000 ease-in-out ${parseFloat(savingsRate) < 5 ? 'bg-error' : 'bg-primary'}`} style={{ width: `${Math.max(0, Math.min(100, parseFloat(savingsRate)))}%` }}></div>
               </div>
-              <p className="text-right text-xs font-bold text-primary mt-2">{savingsRate}%</p>
+              <p className={`text-right text-xs font-bold mt-2 ${parseFloat(savingsRate) < 5 ? 'text-error' : 'text-primary'}`}>{savingsRate}%</p>
             </div>
           </div>
         </section>
@@ -298,10 +338,15 @@ export default function FinanciallyPage() {
                 return (
                   <div
                     key={s.name}
-                    className={`flex-1 rounded-t-xl transition-all cursor-pointer relative group/bar`}
+                    className={`flex-1 rounded-t-xl transition-all relative group/bar flex flex-col items-center justify-center`}
                     style={{ height: `${outerH}%`, backgroundColor: `var(--color-${c}, #ffffff18)`, opacity: s.amount > 0 ? 1 : 0.3 }}
                     title={`${s.name}: ₹${s.amount.toLocaleString("en-IN")}`}
                   >
+                    {s.amount > 0 && (
+                      <span className="text-[10px] md:text-xs font-bold text-on-surface z-10 truncate px-1 max-w-full">
+                        ₹{s.amount >= 1000 ? (s.amount/1000).toFixed(s.amount % 1000 === 0 ? 0 : 1) + 'k' : s.amount}
+                      </span>
+                    )}
                     <div
                       className="absolute inset-x-0 bottom-0 rounded-t-xl transition-all"
                       style={{ height: `${innerH}%`, backgroundColor: `var(--color-${c}, #ffffff40)` }}
@@ -407,18 +452,18 @@ export default function FinanciallyPage() {
                             {!isDone && <span>&#8377;{left.toLocaleString("en-IN")} to go</span>}
                             <div className="flex items-center gap-1.5 bg-surface-container-high rounded-full px-2 py-1">
                               <button
-                                onClick={() => adjustFund(purchase.id, -100)}
+                                onClick={() => { setFundModal({ isOpen: true, purchaseId: purchase.id, title: purchase.title, type: "remove" }); setFundAmount(""); }}
                                 disabled={isDone || purchase.saved === 0}
                                 className="w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors"
-                                title="Remove ₹100"
+                                title="Remove Funds"
                               >
                                 <span className="material-symbols-outlined text-[14px]">remove</span>
                               </button>
                               <button
-                                onClick={() => adjustFund(purchase.id, 100)}
+                                onClick={() => { setFundModal({ isOpen: true, purchaseId: purchase.id, title: purchase.title, type: "add" }); setFundAmount(""); }}
                                 disabled={isDone}
                                 className={`w-6 h-6 flex items-center justify-center rounded-full ${colors.text} hover:bg-surface-container disabled:opacity-30 transition-colors`}
-                                title="Add ₹100"
+                                title="Add Funds"
                               >
                                 <span className="material-symbols-outlined text-[14px]">add</span>
                               </button>
@@ -483,6 +528,23 @@ export default function FinanciallyPage() {
             </div>
           </div>
         </section>
+        
+        {/* Reset Data Button */}
+        <div className="text-center pt-8">
+          <button 
+            onClick={() => {
+              if(confirm("Are you sure you want to completely reset all your financial data? This cannot be undone.")) {
+                localStorage.removeItem("fin_transactions");
+                localStorage.removeItem("futurePurchases");
+                localStorage.removeItem("fin_settled_debt");
+                window.location.reload();
+              }
+            }}
+            className="text-error/70 hover:text-error text-xs uppercase tracking-widest font-label transition-colors"
+          >
+            Reset All Financial Data
+          </button>
+        </div>
       </div>
 
       {/* Mobile spacer */}
@@ -741,6 +803,56 @@ export default function FinanciallyPage() {
               >
                 Create
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fund Goal Modal */}
+      {fundModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0c0e11]/80 backdrop-blur-md">
+          <div className="bg-surface-container-high w-full max-w-sm rounded-3xl p-8 border border-outline-variant/20 shadow-2xl flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+               <h3 className="text-xl font-headline font-bold text-on-surface flex items-center gap-2">
+                 <span className="material-symbols-outlined text-primary">{fundModal.type === "add" ? "add_circle" : "do_not_disturb_on"}</span>
+                 {fundModal.type === "add" ? "Fund Goal" : "Withdraw Funds"}
+               </h3>
+               <button onClick={() => setFundModal({ isOpen: false, purchaseId: null, title: "", type: "add" })} className="text-on-surface-variant hover:text-primary transition-colors">
+                 <span className="material-symbols-outlined">close</span>
+               </button>
+            </div>
+            <p className="text-sm font-body text-on-surface-variant mb-6">
+              {fundModal.type === "add" ? "Allocate money to" : "Remove money from"}: <strong className="text-on-surface">{fundModal.title}</strong>
+              <br />
+              <span className="text-xs italic opacity-70 mt-2 block">This will be recorded as a {fundModal.type === "add" ? "spending" : "earning"} transaction in your Activity History.</span>
+            </p>
+            <div className="space-y-4">
+              <div>
+                 <label className="block text-xs font-label text-on-surface-variant uppercase tracking-widest mb-2">Amount (&#8377;)</label>
+                 <input
+                   type="number"
+                   value={fundAmount}
+                   onChange={e => setFundAmount(e.target.value)}
+                   className="w-full bg-surface-container-lowest/50 rounded-xl p-3 text-on-surface font-body border border-outline-variant/10 focus:outline-none focus:border-primary/50 transition-all text-xl"
+                   placeholder="0"
+                   min="1"
+                   autoFocus
+                 />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-8">
+               <button
+                 onClick={() => setFundModal({ isOpen: false, purchaseId: null, title: "", type: "add" })}
+                 className="px-6 py-3 rounded-full font-label text-sm font-bold text-on-surface-variant hover:bg-surface-container transition-colors"
+               >
+                 Cancel
+               </button>
+               <button
+                 onClick={handleFundSubmit}
+                 className={`px-8 py-3 rounded-full font-label text-sm font-bold shadow-lg text-surface-container-lowest active:scale-95 transition-all ${fundModal.type === 'add' ? 'bg-primary hover:shadow-primary/30' : 'bg-error hover:shadow-error/30 text-white'}`}
+               >
+                 {fundModal.type === "add" ? "Add Funds" : "Remove"}
+               </button>
             </div>
           </div>
         </div>
