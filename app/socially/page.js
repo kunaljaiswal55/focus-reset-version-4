@@ -169,9 +169,14 @@ export default function SociallyPage() {
   const [inputText, setInputText] = useState("");
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [activeModal, setActiveModal] = useState(null); // { key, label, icon, color, bg, value }
+  const [activeModal, setActiveModal] = useState(null);
   const [isLoggingActivity, setIsLoggingActivity] = useState(false);
-  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "local"
+  const [saveStatus, setSaveStatus] = useState("idle");
+
+  // ── Emotional Flow history ────────────────────────────────────────────────────
+  // Each entry: { date, label, avg, family, friends, parties, outings, hasData }
+  const [flowHistory, setFlowHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   // ── Voice state ────────────────────────────────────────────────────────────
   const [voiceEnabled, setVoiceEnabled] = useState(false);  // TTS on/off
@@ -190,38 +195,91 @@ export default function SociallyPage() {
     { key: "outings", label: "Outings", icon: "hiking",          color: "text-sky-400",    bg: "bg-sky-400/10"   },
   ];
 
-  // ── Load from API (falls back gracefully to localStorage) ──────────────────
+  // ── Load everything on mount ───────────────────────────────────────────────────
   useEffect(() => {
     setIsMounted(true);
     const today = new Date().toISOString().split("T")[0];
 
+    // ─ Today's metrics + activities ──────────────────────────────────────
     async function loadMetrics() {
       try {
         const res = await fetch(`/api/social/metrics?date=${today}`);
         const data = await res.json();
-
         if (data.source === "db" && data.metrics) {
           setSocialMetrics(data.metrics);
           setActivities(data.activities || []);
           return;
         }
-      } catch { /* fall through to localStorage */ }
-
-      // Fallback: localStorage
-      const savedMetrics = localStorage.getItem("soc_metrics");
+      } catch { /* fall through */ }
+      const savedMetrics    = localStorage.getItem("soc_metrics");
       const savedActivities = localStorage.getItem("soc_activities");
-      if (savedMetrics) setSocialMetrics(JSON.parse(savedMetrics));
+      if (savedMetrics)    setSocialMetrics(JSON.parse(savedMetrics));
       if (savedActivities) setActivities(JSON.parse(savedActivities));
     }
 
+    // ─ Chat messages ──────────────────────────────────────────────────────
     async function loadMessages() {
-      const savedMessages = localStorage.getItem("soc_messages");
-      if (savedMessages) setMessages(JSON.parse(savedMessages));
+      const saved = localStorage.getItem("soc_messages");
+      if (saved) setMessages(JSON.parse(saved));
+    }
+
+    // ─ 12-day Emotional Flow history ─────────────────────────────────────
+    async function loadHistory() {
+      setHistoryLoading(true);
+      try {
+        const res  = await fetch("/api/social/history?days=12");
+        const data = await res.json();
+
+        if (data.source === "db") {
+          // DB connected — use server data directly
+          setFlowHistory(data.days);
+          setHistoryLoading(false);
+          return;
+        }
+
+        // DB not connected — reconstruct from localStorage
+        // We only have today's snapshot; fill in nulls for older days
+        const todayMetrics = (() => {
+          const m = localStorage.getItem("soc_metrics");
+          return m ? JSON.parse(m) : null;
+        })();
+
+        const rebuilt = data.days.map((entry) => {
+          if (entry.date === today && todayMetrics) {
+            const { family = 0, friends = 0, parties = 0, outings = 0 } = todayMetrics;
+            const avg = Math.round((family + friends + parties + outings) / 4);
+            return { ...entry, avg, family, friends, parties, outings, hasData: true };
+          }
+          return entry; // hasData: false for older days
+        });
+
+        setFlowHistory(rebuilt);
+      } catch {
+        // Silently fail — chart stays empty
+        setFlowHistory([]);
+      }
+      setHistoryLoading(false);
     }
 
     loadMetrics();
     loadMessages();
+    loadHistory();
   }, []);
+
+  // Re-update today's bar in flowHistory whenever metrics change live
+  useEffect(() => {
+    if (!isMounted || flowHistory.length === 0) return;
+    const today = new Date().toISOString().split("T")[0];
+    const { family, friends, parties, outings } = socialMetrics;
+    const avg = Math.round((family + friends + parties + outings) / 4);
+    setFlowHistory((prev) =>
+      prev.map((entry) =>
+        entry.date === today
+          ? { ...entry, avg, family, friends, parties, outings, hasData: true }
+          : entry
+      )
+    );
+  }, [socialMetrics]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Detect voice API support ────────────────────────────────────────────────
   useEffect(() => {
@@ -459,17 +517,15 @@ export default function SociallyPage() {
     setIsAiTyping(false);
   };
 
-  // ── Emotional Flow bars (still from metric average until P3 is fixed) ──────
-  const generateFlow = () => {
-    const base = (socialMetrics.family + socialMetrics.friends + socialMetrics.parties + socialMetrics.outings) / 4;
-    return Array.from({ length: 12 }).map((_, i) => {
-      const noise = Math.sin(i * 0.8) * 15;
-      return Math.max(10, Math.min(95, base + noise + (i === 11 ? 10 : 0)));
-    });
-  };
-  const flowBars = generateFlow();
+  // ── Derived chart values from real history ─────────────────────────────────
   const avgScore = Math.round(
     (socialMetrics.family + socialMetrics.friends + socialMetrics.parties + socialMetrics.outings) / 4
+  );
+  // Find the highest bar index so we can highlight it as the social peak
+  const peakIndex = flowHistory.reduce(
+    (best, entry, i) =>
+      (entry.avg ?? -1) > (flowHistory[best]?.avg ?? -1) ? i : best,
+    0
   );
 
   // ── Save indicator label ───────────────────────────────────────────────────
@@ -723,62 +779,105 @@ export default function SociallyPage() {
             </div>
           )}
 
-          {/* Emotional Flow Chart */}
+          {/* ── Emotional Flow Chart — Real History ───────────────────── */}
           <div className="bg-surface-container-low rounded-[2rem] p-8 relative overflow-hidden shadow-xl">
             <div className="absolute top-0 left-0 w-1 h-full bg-primary shadow-[0_0_15px_rgba(129,236,255,0.5)]" />
 
-            {/* ⚠️ PROBLEM 3 BANNER */}
-            <div className="mb-4 flex items-start gap-2 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3">
-              <span className="material-symbols-outlined text-amber-400 text-lg mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
-              <div>
-                <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Simulated Data</p>
-                <p className="text-[11px] text-amber-400/70 mt-0.5">
-                  This chart uses a <code className="font-mono bg-white/10 px-1 rounded">Math.sin()</code> formula — not real history.
-                  Fix P3 to show real 12-day data from the database.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-end mb-8">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="font-headline text-3xl font-bold text-on-surface tracking-tight">Emotional Flow</h3>
-                <p className="font-body text-on-surface-variant italic">Social average: {avgScore}%</p>
+                <p className="font-body text-on-surface-variant italic mt-1">
+                  {historyLoading
+                    ? "Loading history…"
+                    : `Social average today: ${avgScore}%`}
+                </p>
               </div>
               <div className="flex gap-2 flex-wrap justify-end">
                 <span className={`px-3 py-1 text-[10px] font-bold rounded-full border transition-colors ${
-                  socialMetrics.outings > 50 ? "bg-primary/10 text-primary border-primary/20" : "bg-error/10 text-error border-error/20"
+                  socialMetrics.outings > 50
+                    ? "bg-primary/10 text-primary border-primary/20"
+                    : "bg-error/10 text-error border-error/20"
                 }`}>
                   {socialMetrics.outings > 50 ? "DEPRESSION: LOW" : "DEPRESSION: AT RISK"}
                 </span>
                 <span className={`px-3 py-1 text-[10px] font-bold rounded-full border transition-colors ${
-                  socialMetrics.friends > 40 ? "bg-tertiary/10 text-tertiary border-tertiary/20" : "bg-yellow-400/10 text-yellow-400 border-yellow-400/20"
+                  socialMetrics.friends > 40
+                    ? "bg-tertiary/10 text-tertiary border-tertiary/20"
+                    : "bg-yellow-400/10 text-yellow-400 border-yellow-400/20"
                 }`}>
                   {socialMetrics.friends > 40 ? "ANXIETY: STABLE" : "ANXIETY: ELEVATED"}
                 </span>
               </div>
             </div>
 
-            <div className="h-48 w-full flex items-end justify-between gap-1 mt-10">
-              {flowBars.map((height, i) => (
-                <div key={i} style={{ height: `${height}%` }}
-                  className={`flex-grow rounded-t-full transition-all duration-1000 relative group cursor-help ${
-                    i === 11
-                      ? "bg-gradient-to-t from-tertiary/20 to-tertiary border-t-4 border-tertiary shadow-[0_0_15px_rgba(255,197,99,0.2)]"
-                      : i === 3
-                        ? "bg-gradient-to-t from-primary/20 to-primary border-t-4 border-primary shadow-[0_0_15px_rgba(129,236,255,0.2)]"
-                        : "bg-surface-container-high hover:bg-surface-bright"
-                  }`}>
-                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-surface-bright px-3 py-1.5 rounded-xl text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 whitespace-nowrap shadow-2xl border border-outline-variant/10 z-20">
-                    <span className="text-primary">{Math.round(height)}%</span> {i === 11 ? "Today" : `Day ${i + 1}`}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 flex items-center justify-between text-[10px] text-on-surface-variant font-bold tracking-widest uppercase">
-              <span>11 Days Ago</span>
+            {/* Bars */}
+            {historyLoading ? (
+              /* Skeleton loader */
+              <div className="h-48 w-full flex items-end justify-between gap-1 animate-pulse">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i}
+                    className="flex-grow rounded-t-full bg-surface-container-high"
+                    style={{ height: `${20 + Math.random() * 40}%` }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="h-48 w-full flex items-end justify-between gap-1 mt-4">
+                {flowHistory.map((entry, i) => {
+                  const isToday  = i === flowHistory.length - 1;
+                  const isPeak   = i === peakIndex && entry.hasData;
+                  const height   = entry.hasData ? Math.max(6, entry.avg) : 6;
+
+                  // Colour by score tier
+                  const barColor = !entry.hasData
+                    ? "bg-surface-container-high/40"
+                    : isToday
+                      ? "bg-gradient-to-t from-tertiary/30 to-tertiary border-t-2 border-tertiary shadow-[0_0_12px_rgba(255,197,99,0.25)]"
+                      : isPeak
+                        ? "bg-gradient-to-t from-primary/30 to-primary border-t-2 border-primary shadow-[0_0_12px_rgba(129,236,255,0.25)]"
+                        : entry.avg >= 70
+                          ? "bg-emerald-400/60 hover:bg-emerald-400/80"
+                          : entry.avg >= 40
+                            ? "bg-surface-container-high hover:bg-surface-bright"
+                            : "bg-red-400/40 hover:bg-red-400/60";
+
+                  return (
+                    <div
+                      key={entry.date}
+                      style={{ height: `${height}%` }}
+                      className={`flex-grow rounded-t-sm transition-all duration-700 relative group cursor-help ${barColor}`}
+                    >
+                      {/* Tooltip */}
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-[#1a1d22] border border-white/10 px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100 whitespace-nowrap shadow-2xl z-20 pointer-events-none">
+                        <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1">{entry.label}</p>
+                        {entry.hasData ? (
+                          <>
+                            <p className="text-sm font-bold text-white">Avg: <span className="text-primary">{entry.avg}%</span></p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1.5">
+                              <span className="text-[10px] text-violet-400">Family {entry.family}%</span>
+                              <span className="text-[10px] text-emerald-400">Friends {entry.friends}%</span>
+                              <span className="text-[10px] text-amber-400">Parties {entry.parties}%</span>
+                              <span className="text-[10px] text-sky-400">Outings {entry.outings}%</span>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-[10px] text-white/30 italic">No data logged</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Footer legend */}
+            <div className="mt-5 flex items-center justify-between text-[10px] text-on-surface-variant font-bold tracking-widest uppercase">
+              <span>{flowHistory[0]?.label || "11 Days Ago"}</span>
               <div className="flex gap-4">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary" /> Mood Trend</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tertiary" /> Social Peak</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" /> High ≥70%</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary" /> Peak Day</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tertiary" /> Today</span>
               </div>
               <span>Today</span>
             </div>
