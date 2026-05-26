@@ -200,6 +200,28 @@ export default function SociallyPage() {
     setIsMounted(true);
     const today = new Date().toISOString().split("T")[0];
 
+    // ─ Seed Demo Data if empty and not explicitly reset to blank ──────────
+    const hasInitialized = localStorage.getItem("soc_initialized");
+    if (!hasInitialized) {
+      const defaultMetrics = { family: 60, friends: 75, parties: 40, outings: 50 };
+      const defaultActivities = [
+        { type: "family", label: "Sunday dinner with parents", duration: 90, notes: "Had a great home-cooked meal and caught up on life.", loggedAt: new Date().toISOString() },
+        { type: "friends", label: "Coffee meetup with Sarah", duration: 45, notes: "Nice chat about our upcoming travel plans.", loggedAt: new Date().toISOString() },
+        { type: "outings", label: "Solo sunset walk in the park", duration: 30, notes: "Felt very peaceful and refreshing.", loggedAt: new Date().toISOString() }
+      ];
+      const defaultMessages = [
+        { id: 1, text: "Welcome to Socially! Tap a metric card to log a real activity — I'll track your social balance and give you personalised insights.", sender: "ai", time: "JUST NOW" },
+        { id: 2, text: "Hey! I'm feeling a bit socially drained after the weekend, but I also feel like I haven't seen my family in a while.", sender: "user", time: "10 MINS AGO" },
+        { id: 3, text: "It's completely normal to feel drained, especially after busy weekend events. Balancing high-energy parties with low-energy family time or solo outings is key. Maybe you could call a family member for a quick catch-up? That way, you're maintaining the connection without exhausting yourself.", sender: "ai", time: "9 MINS AGO" },
+        { id: 4, text: "Good idea, I'll call my mom for a bit.", sender: "user", time: "5 MINS AGO" },
+        { id: 5, text: "Perfect! Let me know how it goes. I'll be here to track your progress and chat anytime.", sender: "ai", time: "4 MINS AGO" }
+      ];
+      localStorage.setItem("soc_metrics", JSON.stringify(defaultMetrics));
+      localStorage.setItem("soc_activities", JSON.stringify(defaultActivities));
+      localStorage.setItem("soc_messages", JSON.stringify(defaultMessages));
+      localStorage.setItem("soc_initialized", "true");
+    }
+
     // ─ Today's metrics + activities ──────────────────────────────────────
     async function loadMetrics() {
       try {
@@ -938,20 +960,51 @@ export default function SociallyPage() {
           </div>
         </section>
 
-        {/* Reset Button */}
-        <div className="lg:col-span-12 text-center pt-8 border-t border-outline-variant/10">
+        {/* Reset & Seed Buttons */}
+        <div className="lg:col-span-12 text-center pt-8 border-t border-outline-variant/10 flex flex-wrap justify-center gap-6">
           <button
             onClick={() => {
-              if (confirm("Reset all social metrics, activities, and chat history?")) {
+              if (confirm("Seed demo data for testing? This will populate metrics, activities, and chat history.")) {
+                const defaultMetrics = { family: 60, friends: 75, parties: 40, outings: 50 };
+                const defaultActivities = [
+                  { type: "family", label: "Sunday dinner with parents", duration: 90, notes: "Had a great home-cooked meal and caught up on life.", loggedAt: new Date().toISOString() },
+                  { type: "friends", label: "Coffee meetup with Sarah", duration: 45, notes: "Nice chat about our upcoming travel plans.", loggedAt: new Date().toISOString() },
+                  { type: "outings", label: "Solo sunset walk in the park", duration: 30, notes: "Felt very peaceful and refreshing.", loggedAt: new Date().toISOString() }
+                ];
+                const defaultMessages = [
+                  { id: 1, text: "Welcome to Socially! Tap a metric card to log a real activity — I'll track your social balance and give you personalised insights.", sender: "ai", time: "JUST NOW" },
+                  { id: 2, text: "Hey! I'm feeling a bit socially drained after the weekend, but I also feel like I haven't seen my family in a while.", sender: "user", time: "10 MINS AGO" },
+                  { id: 3, text: "It's completely normal to feel drained, especially after busy weekend events. Balancing high-energy parties with low-energy family time or solo outings is key. Maybe you could call a family member for a quick catch-up? That way, you're maintaining the connection without exhausting yourself.", sender: "ai", time: "9 MINS AGO" },
+                  { id: 4, text: "Good idea, I'll call my mom for a bit.", sender: "user", time: "5 MINS AGO" },
+                  { id: 5, text: "Perfect! Let me know how it goes. I'll be here to track your progress and chat anytime.", sender: "ai", time: "4 MINS AGO" }
+                ];
+                localStorage.setItem("soc_metrics", JSON.stringify(defaultMetrics));
+                localStorage.setItem("soc_activities", JSON.stringify(defaultActivities));
+                localStorage.setItem("soc_messages", JSON.stringify(defaultMessages));
+                localStorage.setItem("soc_initialized", "true");
+                window.location.reload();
+              }
+            }}
+            className="text-primary/70 hover:text-primary text-xs uppercase tracking-widest font-label transition-colors"
+          >
+            Seed Demo Data
+          </button>
+
+          <span className="text-white/10 hidden sm:inline">|</span>
+
+          <button
+            onClick={() => {
+              if (confirm("Reset all social metrics, activities, and chat history to blank?")) {
                 localStorage.removeItem("soc_metrics");
                 localStorage.removeItem("soc_messages");
                 localStorage.removeItem("soc_activities");
+                localStorage.setItem("soc_initialized", "blank");
                 window.location.reload();
               }
             }}
             className="text-error/70 hover:text-error text-xs uppercase tracking-widest font-label transition-colors"
           >
-            Reset Socially Data
+            Reset to Blank
           </button>
         </div>
       </div>

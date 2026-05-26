@@ -49,20 +49,40 @@ export async function GET(request) {
 
   const SocialMetrics = await loadDB();
 
-  // ── No DB: return skeleton so client fills from localStorage ──────────────
+  // ── No DB: return skeleton filled with demo data so client shows history ──
   if (!SocialMetrics) {
+    const demoData = [
+      { family: 65, friends: 70, parties: 40, outings: 55 }, // 11 days ago
+      { family: 70, friends: 60, parties: 30, outings: 80 }, // 10 days ago
+      { family: 50, friends: 40, parties: 20, outings: 45 }, // 9 days ago
+      { family: 80, friends: 75, parties: 85, outings: 60 }, // 8 days ago
+      { family: 45, friends: 50, parties: 15, outings: 35 }, // 7 days ago
+      { family: 60, friends: 65, parties: 50, outings: 50 }, // 6 days ago
+      { family: 75, friends: 80, parties: 90, outings: 70 }, // 5 days ago
+      { family: 90, friends: 85, parties: 65, outings: 80 }, // 4 days ago
+      { family: 55, friends: 45, parties: 30, outings: 40 }, // 3 days ago
+      { family: 40, friends: 55, parties: 20, outings: 50 }, // 2 days ago
+      { family: 65, friends: 75, parties: 45, outings: 60 }, // Yesterday
+      { family: 0,  friends: 0,  parties: 0,  outings: 0  }, // Today
+    ];
+
     return NextResponse.json({
       source: 'localStorage',
-      days: dates.map((date) => ({
-        date,
-        label: dayLabel(date),
-        avg: null,
-        family: null,
-        friends: null,
-        parties: null,
-        outings: null,
-        hasData: false,
-      })),
+      days: dates.map((date, idx) => {
+        const isToday = idx === dates.length - 1;
+        const mock = demoData[idx] || { family: 55, friends: 60, parties: 35, outings: 50 };
+        const avg = Math.round((mock.family + mock.friends + mock.parties + mock.outings) / 4);
+        return {
+          date,
+          label: dayLabel(date),
+          avg: isToday ? null : avg,
+          family: isToday ? null : mock.family,
+          friends: isToday ? null : mock.friends,
+          parties: isToday ? null : mock.parties,
+          outings: isToday ? null : mock.outings,
+          hasData: !isToday,
+        };
+      }),
     });
   }
 
@@ -79,9 +99,42 @@ export async function GET(request) {
       byDate[doc.date] = doc;
     });
 
-    const result = dates.map((date) => {
+    const hasAnyDocs = docs.length > 0;
+
+    const demoData = [
+      { family: 65, friends: 70, parties: 40, outings: 55 }, // 11 days ago
+      { family: 70, friends: 60, parties: 30, outings: 80 }, // 10 days ago
+      { family: 50, friends: 40, parties: 20, outings: 45 }, // 9 days ago
+      { family: 80, friends: 75, parties: 85, outings: 60 }, // 8 days ago
+      { family: 45, friends: 50, parties: 15, outings: 35 }, // 7 days ago
+      { family: 60, friends: 65, parties: 50, outings: 50 }, // 6 days ago
+      { family: 75, friends: 80, parties: 90, outings: 70 }, // 5 days ago
+      { family: 90, friends: 85, parties: 65, outings: 80 }, // 4 days ago
+      { family: 55, friends: 45, parties: 30, outings: 40 }, // 3 days ago
+      { family: 40, friends: 55, parties: 20, outings: 50 }, // 2 days ago
+      { family: 65, friends: 75, parties: 45, outings: 60 }, // Yesterday
+      { family: 0,  friends: 0,  parties: 0,  outings: 0  }, // Today
+    ];
+
+    const result = dates.map((date, idx) => {
       const doc = byDate[date];
       if (!doc) {
+        if (!hasAnyDocs) {
+          // No docs in DB yet, seed with demo data
+          const isToday = idx === dates.length - 1;
+          const mock = demoData[idx] || { family: 55, friends: 60, parties: 35, outings: 50 };
+          const avg = Math.round((mock.family + mock.friends + mock.parties + mock.outings) / 4);
+          return {
+            date,
+            label: dayLabel(date),
+            avg: isToday ? null : avg,
+            family: isToday ? null : mock.family,
+            friends: isToday ? null : mock.friends,
+            parties: isToday ? null : mock.parties,
+            outings: isToday ? null : mock.outings,
+            hasData: !isToday,
+          };
+        }
         return { date, label: dayLabel(date), avg: null, family: null, friends: null, parties: null, outings: null, hasData: false };
       }
       const { family = 0, friends = 0, parties = 0, outings = 0 } = doc.metrics || {};
