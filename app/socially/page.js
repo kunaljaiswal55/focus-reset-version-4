@@ -64,11 +64,10 @@ function ActivityModal({ item, onClose, onSubmit, isLoading }) {
               {presets[item.key].map((p) => (
                 <button type="button" key={p}
                   onClick={() => setLabel(p)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                    label === p
-                      ? `${item.bg} ${item.color} border-transparent`
-                      : 'bg-white/5 text-white/60 border-white/10 hover:border-white/30'
-                  }`}>
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${label === p
+                    ? `${item.bg} ${item.color} border-transparent`
+                    : 'bg-white/5 text-white/60 border-white/10 hover:border-white/30'
+                    }`}>
                   {p}
                 </button>
               ))}
@@ -127,11 +126,10 @@ function ActivityModal({ item, onClose, onSubmit, isLoading }) {
           </div>
 
           <button type="submit" disabled={isLoading || !label.trim()}
-            className={`w-full py-4 rounded-xl font-bold tracking-wide transition-all ${
-              isLoading || !label.trim()
-                ? 'bg-white/10 text-white/30 cursor-not-allowed'
-                : `${item.bg} ${item.color} hover:scale-[1.02] hover:shadow-lg`
-            }`}>
+            className={`w-full py-4 rounded-xl font-bold tracking-wide transition-all ${isLoading || !label.trim()
+              ? 'bg-white/10 text-white/30 cursor-not-allowed'
+              : `${item.bg} ${item.color} hover:scale-[1.02] hover:shadow-lg`
+              }`}>
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -144,6 +142,121 @@ function ActivityModal({ item, onClose, onSubmit, isLoading }) {
     </div>
   );
 }
+
+// ─── Travel Goal Modal ────────────────────────────────────────────────────────
+function TravelGoalModal({ onClose, onSubmit }) {
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState("Solo Trip");
+  const [status, setStatus] = useState("Planned");
+  const [statusDetail, setStatusDetail] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    let finalDetail = statusDetail.trim();
+    if (!finalDetail) {
+      if (status === "Planned") finalDetail = "Planned";
+      else if (status === "Completed") finalDetail = "Completed";
+      else if (status === "Budgeting") finalDetail = "Budgeting";
+    }
+
+    onSubmit({
+      id: Date.now().toString(),
+      title: title.trim(),
+      type,
+      status,
+      statusDetail: finalDetail
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-[#1a1d22] border border-white/10 rounded-[2rem] p-8 w-full max-w-md shadow-2xl animate-in">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-primary/10">
+            <span className="material-symbols-outlined text-primary text-2xl"
+              style={{ fontVariationSettings: "'FILL' 1" }}>flight_takeoff</span>
+          </div>
+          <div>
+            <h3 className="font-headline text-xl font-bold text-white">Add Travel Goal</h3>
+            <p className="text-xs text-white/40 uppercase tracking-widest">Pin your next adventure</p>
+          </div>
+          <button onClick={onClose} className="ml-auto material-symbols-outlined text-white/40 hover:text-white transition-colors">close</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Destination */}
+          <div>
+            <label className="text-xs text-white/40 uppercase tracking-widest block mb-1">Destination / Goal Name *</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Swiss Alps Skiing"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 focus:outline-none focus:border-white/30 transition-colors"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Trip Type */}
+            <div>
+              <label className="text-xs text-white/40 uppercase tracking-widest block mb-1">Trip Type</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white focus:outline-none focus:border-white/30 transition-colors [&>option]:bg-[#1a1d22]"
+              >
+                <option value="Solo Trip">Solo Trip</option>
+                <option value="With Friends">With Friends</option>
+                <option value="With Family">With Family</option>
+                <option value="Business Trip">Business Trip</option>
+              </select>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="text-xs text-white/40 uppercase tracking-widest block mb-1">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white focus:outline-none focus:border-white/30 transition-colors [&>option]:bg-[#1a1d22]"
+              >
+                <option value="Planned">Planned</option>
+                <option value="Budgeting">Budgeting</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Status Detail */}
+          <div>
+            <label className="text-xs text-white/40 uppercase tracking-widest block mb-1">
+              Timing / Details (optional)
+            </label>
+            <input
+              value={statusDetail}
+              onChange={(e) => setStatusDetail(e.target.value)}
+              placeholder="e.g. Q4 2024 or Summer 2025"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 focus:outline-none focus:border-white/30 transition-colors"
+            />
+          </div>
+
+          <button type="submit" disabled={!title.trim()}
+            className={`w-full py-4 rounded-xl font-bold tracking-wide transition-all mt-2 ${!title.trim()
+              ? 'bg-white/10 text-white/30 cursor-not-allowed'
+              : 'bg-primary text-on-primary hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/20'
+              }`}>
+            Add Goal
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 
 // ─── Typing Dots ──────────────────────────────────────────────────────────────
 function TypingDots() {
@@ -180,19 +293,76 @@ export default function SociallyPage() {
 
   // ── Voice state ────────────────────────────────────────────────────────────
   const [voiceEnabled, setVoiceEnabled] = useState(false);  // TTS on/off
-  const [isListening, setIsListening]   = useState(false);  // STT active
+  const [isListening, setIsListening] = useState(false);  // STT active
   const [speakingMsgId, setSpeakingMsgId] = useState(null); // which msg is being spoken
   const [voiceSupport, setVoiceSupport] = useState({ tts: false, stt: false });
   const recognitionRef = useRef(null); // SpeechRecognition instance
-  const synthRef       = useRef(null); // SpeechSynthesis ref
+  const synthRef = useRef(null); // SpeechSynthesis ref
+
+  const [travelGoals, setTravelGoals] = useState([]);
+  const [travelModalActive, setTravelModalActive] = useState(false);
+
+  const toggleGoalStatus = (id) => {
+    setTravelGoals((prev) => {
+      const updated = prev.map((goal) => {
+        if (goal.id === id) {
+          const nextStatus = goal.status === "Completed" ? "Planned" : "Completed";
+          let nextDetail = goal.statusDetail;
+          if (nextStatus === "Completed") {
+            nextDetail = `Completed ${new Date().toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}`;
+          } else if (goal.statusDetail.startsWith("Completed")) {
+            nextDetail = "Planned Trip";
+          }
+          return { ...goal, status: nextStatus, statusDetail: nextDetail };
+        }
+        return goal;
+      });
+      localStorage.setItem("soc_travel_goals", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const deleteGoal = (id) => {
+    setTravelGoals((prev) => {
+      const updated = prev.filter((goal) => goal.id !== id);
+      localStorage.setItem("soc_travel_goals", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const addGoal = async (newGoal) => {
+    let imageUrl = "";
+    try {
+      const res = await fetch(`/api/social/goal-image?q=${encodeURIComponent(newGoal.title)}`);
+      if (res.ok) {
+        const data = await res.json();
+        imageUrl = data.url;
+      }
+    } catch {
+      // Fallback handled below
+    }
+
+    if (!imageUrl) {
+      imageUrl = `https://images.unsplash.com/featured/800x600/?${encodeURIComponent(newGoal.title)}`;
+    }
+
+    const goalWithImage = { ...newGoal, imageUrl };
+
+    setTravelGoals((prev) => {
+      const updated = [...prev, goalWithImage];
+      localStorage.setItem("soc_travel_goals", JSON.stringify(updated));
+      return updated;
+    });
+    setTravelModalActive(false);
+  };
 
   const chatEndRef = useRef(null);
 
   const METRIC_CONFIG = [
-    { key: "family",  label: "Family",  icon: "family_history", color: "text-violet-400", bg: "bg-violet-400/10" },
-    { key: "friends", label: "Friends", icon: "groups",          color: "text-emerald-400", bg: "bg-emerald-400/10" },
-    { key: "parties", label: "Parties", icon: "celebration",     color: "text-amber-400",  bg: "bg-amber-400/10"  },
-    { key: "outings", label: "Outings", icon: "hiking",          color: "text-sky-400",    bg: "bg-sky-400/10"   },
+    { key: "family", label: "Family", icon: "family_history", color: "text-violet-400", bg: "bg-violet-400/10" },
+    { key: "friends", label: "Friends", icon: "groups", color: "text-emerald-400", bg: "bg-emerald-400/10" },
+    { key: "parties", label: "Parties", icon: "celebration", color: "text-amber-400", bg: "bg-amber-400/10" },
+    { key: "outings", label: "Outings", icon: "hiking", color: "text-sky-400", bg: "bg-sky-400/10" },
   ];
 
   // ── Load everything on mount ───────────────────────────────────────────────────
@@ -219,7 +389,171 @@ export default function SociallyPage() {
       localStorage.setItem("soc_metrics", JSON.stringify(defaultMetrics));
       localStorage.setItem("soc_activities", JSON.stringify(defaultActivities));
       localStorage.setItem("soc_messages", JSON.stringify(defaultMessages));
+
+      const defaultTravelGoals = [
+        {
+          id: "1",
+          title: "Maldives Retreat",
+          type: "Solo Trip",
+          status: "Completed",
+          statusDetail: "Q4 2024"
+        },
+        {
+          id: "2",
+          title: "Icelandic Fjords",
+          type: "With Friends",
+          status: "Planned",
+          statusDetail: "Planned"
+        },
+        {
+          id: "3",
+          title: "Kyoto Cherry Blossom Tour",
+          type: "Solo Trip",
+          status: "Completed",
+          statusDetail: "Completed April '23"
+        },
+        {
+          id: "4",
+          title: "Northern Lights Expedition",
+          type: "With Friends",
+          status: "Budgeting",
+          statusDetail: "Winter 2025"
+        }
+      ];
+      localStorage.setItem("soc_travel_goals", JSON.stringify(defaultTravelGoals));
       localStorage.setItem("soc_initialized", "true");
+    }
+
+    // ─ Travel Goals ──────────────────────────────────────────────────────
+    function loadTravelGoals() {
+      const saved = localStorage.getItem("soc_travel_goals");
+      if (saved) {
+        let parsed = JSON.parse(saved);
+
+        // Handle Maldives Retreat
+        const maldivesIndex = parsed.findIndex(
+          (g) => g.title && g.title.toLowerCase().includes("maldives")
+        );
+        if (maldivesIndex > -1) {
+          parsed[maldivesIndex] = {
+            ...parsed[maldivesIndex],
+            title: "Maldives Retreat",
+            type: "Solo Trip",
+            status: "Completed",
+            statusDetail: "Q4 2024"
+          };
+        } else {
+          parsed.unshift({
+            id: "1",
+            title: "Maldives Retreat",
+            type: "Solo Trip",
+            status: "Completed",
+            statusDetail: "Q4 2024"
+          });
+        }
+
+        // Handle Icelandic Fjords
+        const icelandIndex = parsed.findIndex(
+          (g) => g.title && g.title.toLowerCase().includes("iceland")
+        );
+        if (icelandIndex > -1) {
+          parsed[icelandIndex] = {
+            ...parsed[icelandIndex],
+            title: "Icelandic Fjords",
+            type: "With Friends",
+            status: "Planned",
+            statusDetail: "Planned"
+          };
+        } else {
+          parsed.splice(1, 0, {
+            id: "2",
+            title: "Icelandic Fjords",
+            type: "With Friends",
+            status: "Planned",
+            statusDetail: "Planned"
+          });
+        }
+
+        // Handle Kyoto Cherry Blossom Tour
+        const kyotoIndex = parsed.findIndex(
+          (g) => g.title && g.title.toLowerCase().includes("kyoto")
+        );
+        if (kyotoIndex > -1) {
+          parsed[kyotoIndex] = {
+            ...parsed[kyotoIndex],
+            title: "Kyoto Cherry Blossom Tour",
+            type: "Solo Trip",
+            status: "Completed",
+            statusDetail: "Completed April '23"
+          };
+        } else {
+          parsed.splice(2, 0, {
+            id: "3",
+            title: "Kyoto Cherry Blossom Tour",
+            type: "Solo Trip",
+            status: "Completed",
+            statusDetail: "Completed April '23"
+          });
+        }
+
+        // Handle Northern Lights Expedition
+        const northernIndex = parsed.findIndex(
+          (g) => g.title && g.title.toLowerCase().includes("northern")
+        );
+        if (northernIndex > -1) {
+          parsed[northernIndex] = {
+            ...parsed[northernIndex],
+            title: "Northern Lights Expedition",
+            type: "With Friends",
+            status: "Budgeting",
+            statusDetail: "Winter 2025"
+          };
+        } else {
+          parsed.splice(3, 0, {
+            id: "4",
+            title: "Northern Lights Expedition",
+            type: "With Friends",
+            status: "Budgeting",
+            statusDetail: "Winter 2025"
+          });
+        }
+
+        localStorage.setItem("soc_travel_goals", JSON.stringify(parsed));
+        setTravelGoals(parsed);
+      } else {
+        const defaultTravelGoals = [
+          {
+            id: "1",
+            title: "Maldives Retreat",
+            type: "Solo Trip",
+            status: "Completed",
+            statusDetail: "Q4 2024"
+          },
+          {
+            id: "2",
+            title: "Icelandic Fjords",
+            type: "With Friends",
+            status: "Planned",
+            statusDetail: "Planned"
+          },
+          {
+            id: "3",
+            title: "Kyoto Cherry Blossom Tour",
+            type: "Solo Trip",
+            status: "Completed",
+            statusDetail: "Completed April '23"
+          },
+          {
+            id: "4",
+            title: "Northern Lights Expedition",
+            type: "With Friends",
+            status: "Budgeting",
+            statusDetail: "Winter 2025"
+          }
+        ];
+        setTravelGoals(defaultTravelGoals);
+        localStorage.setItem("soc_travel_goals", JSON.stringify(defaultTravelGoals));
+      }
     }
 
     // ─ Today's metrics + activities ──────────────────────────────────────
@@ -233,9 +567,9 @@ export default function SociallyPage() {
           return;
         }
       } catch { /* fall through */ }
-      const savedMetrics    = localStorage.getItem("soc_metrics");
+      const savedMetrics = localStorage.getItem("soc_metrics");
       const savedActivities = localStorage.getItem("soc_activities");
-      if (savedMetrics)    setSocialMetrics(JSON.parse(savedMetrics));
+      if (savedMetrics) setSocialMetrics(JSON.parse(savedMetrics));
       if (savedActivities) setActivities(JSON.parse(savedActivities));
     }
 
@@ -249,7 +583,7 @@ export default function SociallyPage() {
     async function loadHistory() {
       setHistoryLoading(true);
       try {
-        const res  = await fetch("/api/social/history?days=12");
+        const res = await fetch("/api/social/history?days=12");
         const data = await res.json();
 
         if (data.source === "db") {
@@ -286,6 +620,7 @@ export default function SociallyPage() {
     loadMetrics();
     loadMessages();
     loadHistory();
+    loadTravelGoals();
   }, []);
 
   // Re-update today's bar in flowHistory whenever metrics change live
@@ -328,10 +663,10 @@ export default function SociallyPage() {
       (v) => v.lang.startsWith("en") && (v.name.includes("Female") || v.name.includes("Google") || v.name.includes("Samantha"))
     ) || voices.find((v) => v.lang.startsWith("en"));
     if (preferred) utter.voice = preferred;
-    utter.rate   = 1.05;
-    utter.pitch  = 1.1;
+    utter.rate = 1.05;
+    utter.pitch = 1.1;
     utter.volume = 1;
-    utter.onend  = () => setSpeakingMsgId(null);
+    utter.onend = () => setSpeakingMsgId(null);
     utter.onerror = () => setSpeakingMsgId(null);
     window.speechSynthesis.speak(utter);
   }, [voiceEnabled, voiceSupport.tts]);
@@ -345,9 +680,9 @@ export default function SociallyPage() {
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    recognition.onstart  = () => setIsListening(true);
-    recognition.onend    = () => setIsListening(false);
-    recognition.onerror  = () => setIsListening(false);
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
     recognition.onresult = (e) => {
       const transcript = Array.from(e.results)
         .map((r) => r[0].transcript)
@@ -428,7 +763,7 @@ export default function SociallyPage() {
       if (data.source === "db" && data.metrics) {
         // Merge: cap at 100
         finalMetrics = {
-          family:  Math.min(100, data.metrics.family  ?? socialMetrics.family),
+          family: Math.min(100, data.metrics.family ?? socialMetrics.family),
           friends: Math.min(100, data.metrics.friends ?? socialMetrics.friends),
           parties: Math.min(100, data.metrics.parties ?? socialMetrics.parties),
           outings: Math.min(100, data.metrics.outings ?? socialMetrics.outings),
@@ -570,6 +905,14 @@ export default function SociallyPage() {
         />
       )}
 
+      {/* Travel Goal Modal */}
+      {travelModalActive && (
+        <TravelGoalModal
+          onClose={() => setTravelModalActive(false)}
+          onSubmit={addGoal}
+        />
+      )}
+
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-8 pt-6 pb-12">
 
         {/* Mobile Header */}
@@ -589,9 +932,8 @@ export default function SociallyPage() {
               <div className="flex items-center gap-3">
                 <div className="relative">
                   {/* AI avatar — pulses while speaking */}
-                  <div className={`w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center transition-all ${
-                    voiceEnabled && isAiTyping ? "ring-2 ring-primary ring-offset-2 ring-offset-surface-container-high animate-pulse" : ""
-                  }`}>
+                  <div className={`w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center transition-all ${voiceEnabled && isAiTyping ? "ring-2 ring-primary ring-offset-2 ring-offset-surface-container-high animate-pulse" : ""
+                    }`}>
                     <span className="material-symbols-outlined text-on-primary" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-secondary rounded-full border-2 border-surface-container-high" />
@@ -621,11 +963,10 @@ export default function SociallyPage() {
                       setVoiceEnabled((v) => !v);
                     }}
                     title={voiceEnabled ? "Mute AI voice" : "Unmute AI voice"}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                      voiceEnabled
-                        ? "bg-primary text-on-primary shadow-[0_0_12px_rgba(129,236,255,0.4)]"
-                        : "bg-white/5 text-white/40 hover:text-white hover:bg-white/10"
-                    }`}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${voiceEnabled
+                      ? "bg-primary text-on-primary shadow-[0_0_12px_rgba(129,236,255,0.4)]"
+                      : "bg-white/5 text-white/40 hover:text-white hover:bg-white/10"
+                      }`}
                   >
                     <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
                       {voiceEnabled ? "volume_up" : "volume_off"}
@@ -639,14 +980,13 @@ export default function SociallyPage() {
             <div className="flex-grow overflow-y-auto space-y-4 pr-2 mb-4 scrollbar-thin scrollbar-thumb-outline-variant/20">
               {messages.map((msg) => (
                 <div key={msg.id} className={`flex gap-3 group ${msg.sender === "user" ? "flex-row-reverse" : ""}`}>
-                  <div className={`flex-grow p-4 shadow-sm relative ${
-                    msg.sender === "ai"
-                      ? "bg-surface-container rounded-r-xl rounded-bl-xl"
-                      : "bg-primary/10 border-l-2 border-primary rounded-l-xl rounded-br-xl"
-                  }`}>
+                  <div className={`flex-grow p-4 shadow-sm relative ${msg.sender === "ai"
+                    ? "bg-surface-container rounded-r-xl rounded-bl-xl"
+                    : "bg-primary/10 border-l-2 border-primary rounded-l-xl rounded-br-xl"
+                    }`}>
                     <p className="font-body text-base leading-relaxed text-on-surface pr-6">{msg.text}</p>
-                    <div className={`flex items-center mt-2 ${ msg.sender === "user" ? "justify-end" : "justify-between" }`}>
-                      <span className={`text-[10px] uppercase tracking-tighter ${ msg.sender === "user" ? "text-primary" : "text-on-surface-variant" }`}>
+                    <div className={`flex items-center mt-2 ${msg.sender === "user" ? "justify-end" : "justify-between"}`}>
+                      <span className={`text-[10px] uppercase tracking-tighter ${msg.sender === "user" ? "text-primary" : "text-on-surface-variant"}`}>
                         {msg.time}
                       </span>
 
@@ -656,11 +996,10 @@ export default function SociallyPage() {
                           type="button"
                           onClick={() => speakText(msg.text, msg.id)}
                           title="Replay this message"
-                          className={`ml-2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                            speakingMsgId === msg.id
-                              ? "bg-primary text-on-primary shadow-[0_0_8px_rgba(129,236,255,0.5)]"
-                              : "opacity-0 group-hover:opacity-100 bg-white/10 text-white/50 hover:text-white hover:bg-white/20"
-                          }`}
+                          className={`ml-2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${speakingMsgId === msg.id
+                            ? "bg-primary text-on-primary shadow-[0_0_8px_rgba(129,236,255,0.5)]"
+                            : "opacity-0 group-hover:opacity-100 bg-white/10 text-white/50 hover:text-white hover:bg-white/20"
+                            }`}
                         >
                           <span
                             className="material-symbols-outlined text-sm"
@@ -694,8 +1033,8 @@ export default function SociallyPage() {
                   className="w-full bg-surface-container-low border-none border-b-2 border-outline-variant py-4 pl-6 pr-24 rounded-t-xl focus:ring-0 focus:border-primary transition-all font-body text-lg placeholder:text-on-surface-variant/40 disabled:opacity-60"
                   placeholder={
                     isListening ? "" :
-                    isAiTyping  ? "AI is thinking…" :
-                                  "Ask for social advice…"
+                      isAiTyping ? "AI is thinking…" :
+                        "Ask for social advice…"
                   }
                   type="text"
                 />
@@ -718,11 +1057,10 @@ export default function SociallyPage() {
                       onClick={isListening ? stopListening : startListening}
                       disabled={isAiTyping}
                       title={isListening ? "Stop listening" : "Speak your message"}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                        isListening
-                          ? "bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-pulse"
-                          : "text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30"
-                      }`}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isListening
+                        ? "bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-pulse"
+                        : "text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                        }`}
                     >
                       <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
                         {isListening ? "mic_off" : "mic"}
@@ -744,10 +1082,10 @@ export default function SociallyPage() {
         </section>
 
         {/* ── RIGHT: Metrics & Content ───────────────────────────────────── */}
-        <section className="lg:col-span-7 space-y-8">
+        <section className="lg:col-span-7 flex flex-col gap-4 h-[calc(100vh-12rem)] md:h-[650px]">
 
           {/* Metric Cards — now open modal on click */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-shrink-0">
             {METRIC_CONFIG.map((item) => (
               <button
                 key={item.key}
@@ -774,18 +1112,18 @@ export default function SociallyPage() {
 
           {/* Today's Activity Log */}
           {activities.length > 0 && (
-            <div className="bg-surface-container-low rounded-[2rem] p-6 shadow-xl">
-              <h3 className="font-headline text-lg font-bold text-on-surface mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>today</span>
+            <div className="bg-surface-container-low rounded-[2rem] p-5 shadow-xl flex-grow overflow-hidden flex flex-col max-h-[160px] flex-shrink-0">
+              <h3 className="font-headline text-base font-bold text-on-surface mb-2 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>today</span>
                 Today's Activities
                 <span className="ml-auto text-xs text-on-surface-variant font-normal">{activities.length} logged</span>
               </h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <div className="space-y-2 overflow-y-auto pr-1 flex-grow scrollbar-thin">
                 {activities.slice(0, 8).map((act, i) => {
                   const cfg = METRIC_CONFIG.find((c) => c.key === act.type);
                   return (
-                    <div key={i} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
-                      <span className={`material-symbols-outlined text-lg ${cfg?.color}`}
+                    <div key={i} className="flex items-center gap-3 py-1.5 border-b border-white/5 last:border-0 text-sm">
+                      <span className={`material-symbols-outlined text-base ${cfg?.color}`}
                         style={{ fontVariationSettings: "'FILL' 1" }}>{cfg?.icon}</span>
                       <div className="flex-grow min-w-0">
                         <p className="text-sm text-on-surface font-medium truncate">{act.label}</p>
@@ -802,7 +1140,7 @@ export default function SociallyPage() {
           )}
 
           {/* ── Emotional Flow Chart — Real History ───────────────────── */}
-          <div className="bg-surface-container-low rounded-[2rem] p-8 relative overflow-hidden shadow-xl">
+          <div className="bg-surface-container-low rounded-[2rem] p-6 relative overflow-hidden shadow-xl flex-grow flex flex-col justify-between min-h-[220px]">
             <div className="absolute top-0 left-0 w-1 h-full bg-primary shadow-[0_0_15px_rgba(129,236,255,0.5)]" />
 
             {/* Header */}
@@ -816,18 +1154,16 @@ export default function SociallyPage() {
                 </p>
               </div>
               <div className="flex gap-2 flex-wrap justify-end">
-                <span className={`px-3 py-1 text-[10px] font-bold rounded-full border transition-colors ${
-                  socialMetrics.outings > 50
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "bg-error/10 text-error border-error/20"
-                }`}>
+                <span className={`px-3 py-1 text-[10px] font-bold rounded-full border transition-colors ${socialMetrics.outings > 50
+                  ? "bg-primary/10 text-primary border-primary/20"
+                  : "bg-error/10 text-error border-error/20"
+                  }`}>
                   {socialMetrics.outings > 50 ? "DEPRESSION: LOW" : "DEPRESSION: AT RISK"}
                 </span>
-                <span className={`px-3 py-1 text-[10px] font-bold rounded-full border transition-colors ${
-                  socialMetrics.friends > 40
-                    ? "bg-tertiary/10 text-tertiary border-tertiary/20"
-                    : "bg-yellow-400/10 text-yellow-400 border-yellow-400/20"
-                }`}>
+                <span className={`px-3 py-1 text-[10px] font-bold rounded-full border transition-colors ${socialMetrics.friends > 40
+                  ? "bg-tertiary/10 text-tertiary border-tertiary/20"
+                  : "bg-yellow-400/10 text-yellow-400 border-yellow-400/20"
+                  }`}>
                   {socialMetrics.friends > 40 ? "ANXIETY: STABLE" : "ANXIETY: ELEVATED"}
                 </span>
               </div>
@@ -836,7 +1172,7 @@ export default function SociallyPage() {
             {/* Bars */}
             {historyLoading ? (
               /* Skeleton loader */
-              <div className="h-48 w-full flex items-end justify-between gap-1 animate-pulse">
+              <div className="flex-grow h-32 min-h-[80px] w-full flex items-end justify-between gap-1 animate-pulse">
                 {Array.from({ length: 12 }).map((_, i) => (
                   <div key={i}
                     className="flex-grow rounded-t-full bg-surface-container-high"
@@ -845,13 +1181,12 @@ export default function SociallyPage() {
                 ))}
               </div>
             ) : (
-              <div className="h-48 w-full flex items-end justify-between gap-1 mt-4">
+              <div className="flex-grow h-32 min-h-[80px] w-full flex items-end justify-between gap-1 mt-4">
                 {flowHistory.map((entry, i) => {
-                  const isToday  = i === flowHistory.length - 1;
-                  const isPeak   = i === peakIndex && entry.hasData;
-                  const height   = entry.hasData ? Math.max(6, entry.avg) : 6;
+                  const isToday = i === flowHistory.length - 1;
+                  const isPeak = i === peakIndex && entry.hasData;
+                  const height = entry.hasData ? Math.max(6, entry.avg) : 6;
 
-                  // Colour by score tier
                   const barColor = !entry.hasData
                     ? "bg-surface-container-high/40"
                     : isToday
@@ -904,55 +1239,107 @@ export default function SociallyPage() {
               <span>Today</span>
             </div>
           </div>
+        </section>
 
-          {/* Travel Bucket List */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start pb-8">
-            <div>
+        {/* ── FULL WIDTH BOTTOM: Travel Bucket List ───────────────────────── */}
+        <section className="lg:col-span-12 mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pb-8">
+            <div className="lg:col-span-8">
               <h3 className="font-headline text-5xl font-bold text-on-surface-variant/20 mb-4 leading-none select-none uppercase tracking-tighter">Wanderlust</h3>
-              <div className="space-y-4">
-                <div className="group relative overflow-hidden rounded-[2.5rem] shadow-xl">
-                  <img alt="Maldives lagoon" className="w-full h-40 object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100"
-                    src="https://images.unsplash.com/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&q=80&w=800" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-surface/90 to-transparent group-hover:from-surface/40 transition-all flex flex-col justify-end p-6">
-                    <h4 className="font-headline text-xl text-on-surface font-bold">Maldives Retreat</h4>
-                    <p className="text-xs text-on-surface-variant uppercase tracking-widest">Q4 2024 · Solo Trip</p>
-                  </div>
-                </div>
-                <div className="group relative overflow-hidden rounded-[2.5rem] shadow-xl">
-                  <img alt="Icelandic landscape" className="w-full h-32 object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100"
-                    src="https://images.unsplash.com/photo-1504109586057-7a2ae83d1338?auto=format&fit=crop&q=80&w=800" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-surface/90 to-transparent group-hover:from-surface/40 transition-all flex flex-col justify-end p-6">
-                    <h4 className="font-headline text-xl text-on-surface font-bold">Icelandic Fjords</h4>
-                    <p className="text-xs text-on-surface-variant uppercase tracking-widest">Planned · With Friends</p>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-[30rem] overflow-y-auto pr-1 scrollbar-thin">
+                {travelGoals.map((goal, i) => {
+                  const getGoalImage = (title) => {
+                    const t = title.toLowerCase();
+                    if (t.includes("maldives")) return "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&q=80&w=800";
+                    if (t.includes("iceland")) return "https://images.unsplash.com/photo-1504109586057-7a2ae83d1338?auto=format&fit=crop&q=80&w=800";
+                    if (t.includes("kyoto") || t.includes("cherry")) return "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800";
+                    if (t.includes("northern") || t.includes("aurora") || t.includes("lights")) return "https://images.unsplash.com/photo-1579033461380-adb47c3eb938?auto=format&fit=crop&q=80&w=800";
+                    return `https://images.unsplash.com/featured/800x600/?${encodeURIComponent(title)}`;
+                  };
+
+                  return (
+                    <div key={`wander-${goal.id}-${i}`} className="group relative overflow-hidden rounded-[2.5rem] shadow-xl h-36">
+                      <img
+                        alt={goal.title}
+                        className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100"
+                        src={goal.imageUrl || getGoalImage(goal.title)}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface/90 to-transparent group-hover:from-surface/40 transition-all flex flex-col justify-end p-6">
+                        <h4 className="font-headline text-lg text-on-surface font-bold truncate">{goal.title}</h4>
+                        <p className="text-xs text-on-surface-variant uppercase tracking-widest truncate">
+                          {goal.statusDetail} {goal.type ? `· ${goal.type}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div className="bg-surface-container-high rounded-[2rem] p-8 border border-outline-variant/10 self-stretch shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-headline text-2xl font-bold">Travel Goals</h3>
-                <button className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-on-primary transition-all">
-                  <span className="material-symbols-outlined">add</span>
-                </button>
+
+            <div className="lg:col-span-4 bg-surface-container-high rounded-[2rem] p-8 border border-outline-variant/10 self-stretch shadow-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-headline text-2xl font-bold">Travel Goals</h3>
+                  <button
+                    onClick={() => setTravelModalActive(true)}
+                    className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-on-primary transition-all"
+                  >
+                    <span className="material-symbols-outlined">add</span>
+                  </button>
+                </div>
+
+                {travelGoals.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant/50 italic py-4 text-center">No travel goals set. Click '+' to add one!</p>
+                ) : (
+                  <ul className="space-y-6 max-h-[18rem] overflow-y-auto pr-1 scrollbar-thin">
+                    {travelGoals.map((goal, idx) => (
+                      <li key={`goal-${goal.id}-${idx}`} className="flex items-center gap-4 group">
+                        <div className={`w-2 h-2 rounded-full transition-all ${goal.status === "Completed"
+                          ? "bg-secondary shadow-[0_0_8px_#9df197]"
+                          : "bg-outline-variant"
+                          }`} />
+
+                        <div className="flex-grow min-w-0">
+                          <p className={`font-body text-lg text-on-surface transition-colors truncate ${goal.status === "Completed" ? "line-through decoration-primary/50 text-on-surface-variant/60" : "group-hover:text-primary"
+                            }`}>{goal.title}</p>
+                          <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tighter truncate">
+                            {goal.statusDetail} {goal.type ? `· ${goal.type}` : ''}
+                          </p>
+                        </div>
+
+                        {/* Default visible status icon (hidden on hover) */}
+                        <div className="group-hover:hidden flex items-center">
+                          <span className={`material-symbols-outlined text-lg ${goal.status === "Completed" ? "text-secondary" : "text-on-surface-variant"
+                            }`} style={goal.status === "Completed" ? { fontVariationSettings: "'FILL' 1" } : {}}>
+                            {goal.status === "Completed" ? "check_circle" : "flight_takeoff"}
+                          </span>
+                        </div>
+
+                        {/* Interactive actions appearing on hover */}
+                        <div className="hidden group-hover:flex items-center gap-3 transition-opacity">
+                          <button
+                            onClick={() => toggleGoalStatus(goal.id)}
+                            className="text-on-surface-variant hover:text-white transition-colors"
+                            title={goal.status === "Completed" ? "Mark as Planned" : "Mark as Completed"}
+                          >
+                            <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: `'FILL' ${goal.status === "Completed" ? 1 : 0}` }}>
+                              check_circle
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => deleteGoal(goal.id)}
+                            className="text-error/70 hover:text-error transition-colors"
+                            title="Delete goal"
+                          >
+                            <span className="material-symbols-outlined text-lg">delete</span>
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <ul className="space-y-6">
-                <li className="flex items-center gap-4 group">
-                  <div className="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_#9df197]" />
-                  <div className="flex-grow">
-                    <p className="font-body text-lg text-on-surface line-through decoration-primary/50">Kyoto Cherry Blossom Tour</p>
-                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tighter">Completed April '23</p>
-                  </div>
-                  <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                </li>
-                <li className="flex items-center gap-4 group">
-                  <div className="w-2 h-2 rounded-full bg-outline-variant" />
-                  <div className="flex-grow">
-                    <p className="font-body text-lg text-on-surface group-hover:text-primary transition-colors">Northern Lights Expedition</p>
-                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tighter">Budgeting Stage: $1,200/4,000</p>
-                  </div>
-                  <span className="material-symbols-outlined text-on-surface-variant">flight_takeoff</span>
-                </li>
-              </ul>
               <div className="mt-8 pt-6 border-t border-outline-variant/15 text-center">
                 <p className="font-body italic text-on-surface-variant text-sm">"Travel is the only thing you buy that makes you richer."</p>
               </div>
@@ -978,9 +1365,40 @@ export default function SociallyPage() {
                   { id: 4, text: "Good idea, I'll call my mom for a bit.", sender: "user", time: "5 MINS AGO" },
                   { id: 5, text: "Perfect! Let me know how it goes. I'll be here to track your progress and chat anytime.", sender: "ai", time: "4 MINS AGO" }
                 ];
+                const defaultTravelGoals = [
+                  {
+                    id: "1",
+                    title: "Maldives Retreat",
+                    type: "Solo Trip",
+                    status: "Completed",
+                    statusDetail: "Q4 2024"
+                  },
+                  {
+                    id: "2",
+                    title: "Icelandic Fjords",
+                    type: "With Friends",
+                    status: "Planned",
+                    statusDetail: "Planned"
+                  },
+                  {
+                    id: "3",
+                    title: "Kyoto Cherry Blossom Tour",
+                    type: "Solo Trip",
+                    status: "Completed",
+                    statusDetail: "Completed April '23"
+                  },
+                  {
+                    id: "4",
+                    title: "Northern Lights Expedition",
+                    type: "With Friends",
+                    status: "Budgeting",
+                    statusDetail: "Winter 2025"
+                  }
+                ];
                 localStorage.setItem("soc_metrics", JSON.stringify(defaultMetrics));
                 localStorage.setItem("soc_activities", JSON.stringify(defaultActivities));
                 localStorage.setItem("soc_messages", JSON.stringify(defaultMessages));
+                localStorage.setItem("soc_travel_goals", JSON.stringify(defaultTravelGoals));
                 localStorage.setItem("soc_initialized", "true");
                 window.location.reload();
               }
@@ -998,6 +1416,7 @@ export default function SociallyPage() {
                 localStorage.removeItem("soc_metrics");
                 localStorage.removeItem("soc_messages");
                 localStorage.removeItem("soc_activities");
+                localStorage.removeItem("soc_travel_goals");
                 localStorage.setItem("soc_initialized", "blank");
                 window.location.reload();
               }
